@@ -9,7 +9,6 @@ rchain/*
 !rchain/rnode0
 rchain/rnode0/*
 !rchain/rnode0/genesis
-!rchain/config.conf
 
 # .gitingore 必须要有
 !.gitingore
