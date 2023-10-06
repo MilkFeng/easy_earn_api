@@ -7,9 +7,6 @@ logs/
 # rnode 生成的文件
 rchain/*
 !rchain/rnode-release
-rchain/rnode-release/*
-!rchain/rnode0
-rchain/rnode0/*
 !rchain/rnode0/genesis
 
 # .gitingore 必须要有
