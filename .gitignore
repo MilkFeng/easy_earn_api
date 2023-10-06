@@ -6,6 +6,8 @@ logs/
 
 # rnode 生成的文件
 rchain/*
+!rchain/rnode0
+rchain/rnode0/*
 !rchain/rnode0/genesis
 !rchain/config.conf
 
