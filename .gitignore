@@ -5,7 +5,7 @@ node_modules/
 logs/
 
 # rnode 生成的文件
-rchain/
+rchain/*
 !rchain/rnode0/genesis
 !rchain/config.conf
 
