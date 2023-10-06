@@ -1,0 +1,13 @@
+# node.js 生成的文件
+node_modules/
+
+# 日志文件
+logs/
+
+# rnode 生成的文件
+rchain/
+!rchain/rnode0/genesis
+!rchain/config.conf
+
+# .gitingore 必须要有
+!.gitingore

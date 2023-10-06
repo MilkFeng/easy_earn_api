@@ -1,0 +1,201 @@
+new
+    result,
+    ri(`rho:registry:insertArbitrary`),
+    utils, decodeBase58, stringToList, iterate,
+    EasyTokenVault, balanceMapCh, nonceMapCh, verify
+in {
+    contract decodeBase58(@str, ack) = {
+        new strListCh in {
+            stringToList!(str, *strListCh) |
+            for(@list <- strListCh) {
+                new process, done, shutdown in {
+                    contract process(@str, ack) = {
+                        if(
+                            ((str >= "1" and str <= "9") or (str >= "a" and str <= "z") or (str >= "A" and str <= "Z")) and
+                            (str != "0" and str != "O" and str != "I" and str != "l")
+                        ) { ack!(true) }
+                        else { ack!(false) }
+                    } |
+                    contract done(_) = {
+                        ack!((true, list))
+                    } |
+                    contract shutdown(_) = {
+                        ack!((false, "Invalid Base58 string"))
+                    } |
+                    iterate!(list, *process, *shutdown, *done)
+                }
+            }
+        }
+    } |
+    contract iterate(@list, process, shutdown, done) = {
+        match list {
+            [hd, ...tl] => {
+                new ack in {
+                    process!(hd, *ack) |
+                    for(@chk <- ack) {
+                        if(not chk) { shutdown!(Nil) }
+                        else { iterate!(tl, *process, *shutdown, *done) }
+                    }
+                }
+            } _ => done!(Nil)
+        }
+    } |
+    contract stringToList(@str, ack) = {
+        new iterCh, retCh in {
+            iterCh!(0) | retCh!([]) |
+            for(@index <= iterCh) {
+                if(index < str.length()) {
+                    for(@ret <- retCh) {
+                        retCh!(ret ++ [str.slice(index, index + 1)]) |
+                        iterCh!(index + 1)
+                    }
+                } else {
+                    for(@ret <- retCh) {
+                        ack!(ret)
+                    }
+                }
+            }
+        }
+    } |
+    contract utils(@"verifyRevAddress", @address, ack) = {
+        new decodedCh in {
+            decodeBase58!(address, *decodedCh) |
+            for(@(success, ret) <- decodedCh) {
+                if(success) {
+                    ack!((true, "Valid Base58 string"))
+                    // 还要判断 checksum，太麻烦了，先不写了
+                } else { ack!((success, ret)) }
+            }
+        }
+    } |
+    contract EasyTokenVault(@"name", ack) = {
+        ack!((true, "Easy Token"))
+    } |
+    contract EasyTokenVault(@"totalSupply", ack) = {
+        ack!((true, 10000000000))
+    } |
+    contract EasyTokenVault(@"symbol", ack) = {
+        ack!((true, "$"))
+    } |
+    contract EasyTokenVault(@"decimal", ack) = {
+        ack!((true, 10))
+    } |
+
+    contract EasyTokenVault(@"find", @address, ack) = {
+        for(@balanceMap <<- balanceMapCh; @nonceMap <<- nonceMapCh) {
+            if(balanceMap.contains(address) and nonceMap.contains(address)) ack!((true, address))
+            else ack!((false, "wallet not found"))
+        }
+    } |
+    contract EasyTokenVault(@"create", @address, ack) = {
+        new findCh, chkCh in {
+            utils!("verifyRevAddress", address, *chkCh) |
+            EasyTokenVault!("find", address, *findCh) |
+            for(@(findSuc, _) <- findCh; @(chkSuc, ret) <- chkCh) {
+                if(findSuc) { ack!((false, "wallet already exists")) }
+                else {
+                    if(not chkSuc) { ack!((false, ret)) }
+                    else {
+                        for(@balanceMap <- balanceMapCh; @nonceMap <- nonceMapCh) {
+                            balanceMapCh!(balanceMap.union({address: 0})) |
+                            nonceMapCh!(nonceMap.union({address: -1})) |
+                            ack!((true, address))
+                        }
+                    }
+                }
+            }
+        }
+    } |
+    contract EasyTokenVault(@"findOrCreate", @address, ack) = {
+        new retCh, createRetCh in {
+            EasyTokenVault!("find", address, *retCh) |
+            for(@(success, _) <- retCh) {
+                if(success) { ack!((true, address)) }
+                else {
+                    EasyTokenVault!("create", address, *createRetCh) |
+                    for(@ret <- createRetCh) {
+                        ack!(ret)
+                    }
+                }
+            }
+        }
+    } |
+    
+    contract EasyTokenVault(@"getNonce", @address, ack) = {
+        for(@nonceMap <<- nonceMapCh) {
+            if(nonceMap.contains(address)) ack!((true, nonceMap.get(address)))
+            else ack!((false, "wallet not found"))
+        }
+    } |
+    contract EasyTokenVault(@"balanceOf", @address, ack) = {
+        for(@balanceMap <<- balanceMapCh) {
+            if(balanceMap.contains(address)) ack!((true, balanceMap.get(address)))
+            else ack!((false, "wallet not found"))
+        }
+    } |
+    contract verify(@from, @to, @nonce, @amount, @pk, @sig, ack) = {
+        for(@nonceMap <- nonceMapCh) {
+            if(nonce == (nonceMap.get(from) + 1)) {
+                new hashOutCh, verifyRetCh in {
+                    @"blake2b256Hash"!([nonce, amount, to].toByteArray(), *hashOutCh) |
+                    for(@hash <- hashOutCh) {
+                        @"secp256k1Verify"!(hash, sig.hexToBytes(), pk, *verifyRetCh) |
+                        for(@r <- verifyRetCh) {
+                            if(r) {
+                                nonceMapCh!(nonceMap.set(from, nonce)) | ack!(true, "verify success")
+                            } else {
+                                nonceMapCh!(nonceMap) | ack!(false, "verify failed")
+                            }
+                        }
+                    }
+                }
+            } else {
+                nonceMapCh!(nonceMap) | ack!(false, "nonce not match")
+            }
+        }
+    } |
+    contract EasyTokenVault(@"transfer", @from, @to, @nonce, @amount, @pk, @sig, ack) = {
+        new retFromCh, retToCh in {
+            EasyTokenVault!("find", from, *retFromCh) |
+            EasyTokenVault!("find", to, *retToCh) |
+            for(@(successFrom, _) <- retFromCh; @(successTo, _) <- retToCh) {
+                if((not successFrom) or (not successTo)) ack!((false, "wallet not found"))
+                else {
+                    new verifyCh in {
+                        verify!(from, to, nonce, amount, pk, sig, *verifyCh) |
+                        for(@(success, ret) <- verifyCh) {
+                            if(success) {
+                                for(@balanceMap <<- balanceMapCh) {
+                                    if(balanceMap.get(from) - amount < 0) {
+                                        ack!((false, "overdraft"))
+                                    } else {
+                                        balanceMapCh!(
+                                            balanceMap
+                                                .set(from, balanceMap.get(from) - amount)
+                                                .set(to, balanceMap.get(to) + amount)
+                                        ) |
+                                        ack!((true, "transfer success"))
+                                    }
+                                }
+                            } else ack!((false, ret))
+                        }
+                    }
+                }
+            }
+        }
+    } |
+    new
+        revAddressCh,
+        deployerId(`rho:rchain:deployerId`),
+        revAddressOps(`rho:rev:address`),
+        stdout(`rho:io:stdout`)
+    in {
+        revAddressOps!("fromDeployerId", *deployerId, *revAddressCh) |
+        for(@address <- revAddressCh) {
+            balanceMapCh!({ address: 10000000000 }) |
+            nonceMapCh!({ address: -1 })
+        }
+    } |
+
+    ri!(bundle+ {*EasyTokenVault}, *result)
+}
