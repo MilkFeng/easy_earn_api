@@ -1,6 +1,5 @@
 new
     result,
-    ri(`rho:registry:insertArbitrary`),
     utils, decodeBase58, stringToList, iterate,
     EasyTokenVault, balanceMapCh, nonceMapCh, verify
 in {
@@ -197,5 +196,7 @@ in {
         }
     } |
 
-    ri!(bundle+ {*EasyTokenVault}, *result)
+    new ri(`rho:registry:insertArbitrary`) in {
+        ri!(bundle+ {*EasyTokenVault}, *result)
+    }
 }
