@@ -6,7 +6,7 @@ const { func_deploy, func_deploy_fromfile, func_deploy_fromfile_with_template } 
 const router = express.Router();
 
 // EasyToken 的地址
-const token_id = "rho:id:i1be8sj7z4a5e6bg7cn6rt11guss6kxx3hoc13afghgeroqj6n5max";
+const token_id = "rho:id:gs5f4z3rq3r7rexnw4yq5ftxxwgj6y87eijju9xfgygjkgihw34efa";
 
 const verify_address = (body, res) => {
     let address;
