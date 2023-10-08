@@ -9,5 +9,8 @@ rchain/*
 !rchain/rnode-release
 !rchain/rnode0/genesis
 
+# 数据库文件
+src/database/
+
 # .gitingore 必须要有
 !.gitingore

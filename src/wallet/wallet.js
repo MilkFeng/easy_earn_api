@@ -1,12 +1,10 @@
 const express = require('express');
 const { verifyRevAddr } = require('@tgrospic/rnode-grpc-js')
-const { func_deploy, func_deploy_fromfile, func_deploy_fromfile_with_template } = require('./../common/deploy.js');
+const { create_wallet, find_wallet, get_balance } = require('./../common/rhoopt.js');
+const rchainToolkit = require('@fabcotech/rchain-toolkit');
 
 // 创建一个路由
 const router = express.Router();
-
-// EasyToken 的地址
-const token_id = "rho:id:gs5f4z3rq3r7rexnw4yq5ftxxwgj6y87eijju9xfgygjkgihw34efa";
 
 const verify_address = (body, res) => {
     let address;
@@ -26,24 +24,53 @@ const verify_address = (body, res) => {
     return address;
 };
 
+const verify_pk = (body, res) => {
+    let pk;
+    try {
+        pk = body.pk;
+    } catch (error) {
+        res.status(400).send({ msg: "invalid request body" });
+        return null;
+    }
+    console.log(`get pk: ${pk}`);
+
+    try {
+        rchainToolkit.utils.revAddressFromPublicKey(pk);
+    } catch(err) {
+        res.status(400).send({ msg: "invalid public key" });
+        return null;
+    }
+
+    return pk;
+}
+
 // 创建钱包
 router.post('/create', async (req, res) => {
     // 创建一个新的钱包，这里需要客户端发送钱包地址
+    const pk = verify_pk(req.body, res);
+    if(pk == null) return ;
+
+    const ret = await create_wallet(pk);
+
+    if(ret) {
+        if(ret[0]) res.status(200).send({ msg: "wallet create successfully", address: ret[1] });
+        else res.status(409).send({ msg: ret[1] });
+    } else return res.status(409).send({ msg: "unable to communicate with rnode" });
+});
+
+// 查找钱包
+router.post('/find', async (req, res) => {
+    // 查找钱包，这里需要客户端发送钱包地址
     const address = verify_address(req.body, res);
     if(address == null) return ;
 
-    // 区块链操作
-    const rho_code = `new result, rl(\`rho:registry:lookup\`), vaultCh in {
-        rl!(\`${token_id}\`, *vaultCh) |
-        for(vault <- vaultCh) {
-            vault!("create", "${address}", *result)
-        }
-    }`;
+    const ret = await find_wallet(rho_code, 0);
 
-    const ret = await func_deploy(rho_code, 0);
-
-    if(ret[0]) res.status(200).send({ msg: ret[1] });
-    else res.status(409).send({ msg: ret[1] });
+    try {
+        return res.status(200).send({ res: ret[0], address: ret[1] });
+    } catch(err) {
+        return res.status(409).send({ msg: "unable to communicate with rnode" });
+    }
 });
 
 // 检测钱包中的代币余额
@@ -51,18 +78,12 @@ router.post('/balance', async (req, res) => {
     const address = verify_address(req.body, res);
     if(address == null) return ;
 
-    // 区块链操作
-    const rho_code = `new result, rl(\`rho:registry:lookup\`), vaultCh in {
-        rl!(\`${token_id}\`, *vaultCh) |
-        for(vault <- vaultCh) {
-            vault!("balanceOf", "${address}", *result)
-        }
-    }`;
+    const ret = await get_balance(rho_code, 0);
 
-    const ret = await func_deploy(rho_code, 0);
-
-    if(ret[0]) res.status(200).send({ msg: "get balance successfully", balance: ret[1] });
-    else res.status(409).send({ msg: ret[1] });
+    if(ret) {
+        if(ret[0]) res.status(200).send({ msg: "get balance successfully", balance: ret[1] });
+        else res.status(409).send({ msg: ret[1] });
+    } else res.status(409).send({ msg: "unable to communicate with rnode" });
 });
 
 // 导出路由

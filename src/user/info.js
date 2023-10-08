@@ -1,0 +1,47 @@
+const express = require('express');
+const { passport, db } = require('./passport.js');
+const sqlite3 = require('sqlite3').verbose();
+
+const router = express.Router();
+
+db.run(`CREATE TABLE IF NOT EXISTS wallet (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userId TEXT NOT NULL,
+  address TEXT NOT NULL,
+)`);
+
+router.get('/get-wallets', passport.authenticate('jwt', { session: false }), (req, res) => {
+  const userId = req.user.id;
+
+  // 使用 userId 查询数据库，获取关联的所有地址
+  db.all('SELECT address FROM wallet WHERE userId = ?', userId, (err, rows) => {
+    if (err) {
+      return res.status(500).send({ msg: 'Internal Server Error' });
+    }
+
+    // 从查询结果中提取地址
+    const addresses = rows.map(row => row.address);
+
+    // 返回地址列表给客户端
+    return res.status(200).send({ addresses: addresses });
+  });
+});
+
+// 添加钱包地址
+router.post('/add-wallet', passport.authenticate('jwt', { session: false }), (req, res) => {
+
+  const userId = req.user.id;
+
+  // 检查地址是否已存在
+});
+
+// 删除钱包地址
+
+
+// 获取钱包地址
+
+
+
+
+module.exports = router;
+

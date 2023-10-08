@@ -1,72 +1,4 @@
-new
-    result,
-    utils, decodeBase58, stringToList, iterate,
-    EasyTokenVault, balanceMapCh, nonceMapCh, verify
-in {
-    contract decodeBase58(@str, ack) = {
-        new strListCh in {
-            stringToList!(str, *strListCh) |
-            for(@list <- strListCh) {
-                new process, done, shutdown in {
-                    contract process(@str, ack) = {
-                        if(
-                            ((str >= "1" and str <= "9") or (str >= "a" and str <= "z") or (str >= "A" and str <= "Z")) and
-                            (str != "0" and str != "O" and str != "I" and str != "l")
-                        ) { ack!(true) }
-                        else { ack!(false) }
-                    } |
-                    contract done(_) = {
-                        ack!((true, list))
-                    } |
-                    contract shutdown(_) = {
-                        ack!((false, "Invalid Base58 string"))
-                    } |
-                    iterate!(list, *process, *shutdown, *done)
-                }
-            }
-        }
-    } |
-    contract iterate(@list, process, shutdown, done) = {
-        match list {
-            [hd, ...tl] => {
-                new ack in {
-                    process!(hd, *ack) |
-                    for(@chk <- ack) {
-                        if(not chk) { shutdown!(Nil) }
-                        else { iterate!(tl, *process, *shutdown, *done) }
-                    }
-                }
-            } _ => done!(Nil)
-        }
-    } |
-    contract stringToList(@str, ack) = {
-        new iterCh, retCh in {
-            iterCh!(0) | retCh!([]) |
-            for(@index <= iterCh) {
-                if(index < str.length()) {
-                    for(@ret <- retCh) {
-                        retCh!(ret ++ [str.slice(index, index + 1)]) |
-                        iterCh!(index + 1)
-                    }
-                } else {
-                    for(@ret <- retCh) {
-                        ack!(ret)
-                    }
-                }
-            }
-        }
-    } |
-    contract utils(@"verifyRevAddress", @address, ack) = {
-        new decodedCh in {
-            decodeBase58!(address, *decodedCh) |
-            for(@(success, ret) <- decodedCh) {
-                if(success) {
-                    ack!((true, "Valid Base58 string"))
-                    // 还要判断 checksum，太麻烦了，先不写了
-                } else { ack!((success, ret)) }
-            }
-        }
-    } |
+new result, EasyTokenVault, balanceMapCh, nonceMapCh, verify, revAddressOps(`rho:rev:address`)in {
     contract EasyTokenVault(@"name", ack) = {
         ack!((true, "Easy Token"))
     } |
@@ -86,40 +18,27 @@ in {
             else ack!((false, "wallet not found"))
         }
     } |
-    contract EasyTokenVault(@"create", @address, ack) = {
-        new findCh, chkCh in {
-            utils!("verifyRevAddress", address, *chkCh) |
-            EasyTokenVault!("find", address, *findCh) |
-            for(@(findSuc, _) <- findCh; @(chkSuc, ret) <- chkCh) {
-                if(findSuc) { ack!((false, "wallet already exists")) }
-                else {
-                    if(not chkSuc) { ack!((false, ret)) }
-                    else {
+    contract EasyTokenVault(@"create", @pk, ack) = {
+        new revAddrCh in {
+            revAddressOps!("fromPublicKey", pk.hexToBytes(), *revAddrCh) |
+            for(@address <- revAddrCh) {
+                match address {
+                    Nil => ack!((false, "invalid public key"))
+                    String => {
                         for(@balanceMap <- balanceMapCh; @nonceMap <- nonceMapCh) {
-                            balanceMapCh!(balanceMap.union({address: 0})) |
-                            nonceMapCh!(nonceMap.union({address: -1})) |
-                            ack!((true, address))
+                            if(balanceMap.contains(address) and nonceMap.contains(address)) {
+                                ack!((false, "wallet already exists"))
+                            } else {
+                                balanceMapCh!(balanceMap.union({ address: 0 })) |
+                                nonceMapCh!(nonceMap.union({ address: -1 })) |
+                                ack!((true, address))
+                            }
                         }
                     }
                 }
             }
         }
     } |
-    contract EasyTokenVault(@"findOrCreate", @address, ack) = {
-        new retCh, createRetCh in {
-            EasyTokenVault!("find", address, *retCh) |
-            for(@(success, _) <- retCh) {
-                if(success) { ack!((true, address)) }
-                else {
-                    EasyTokenVault!("create", address, *createRetCh) |
-                    for(@ret <- createRetCh) {
-                        ack!(ret)
-                    }
-                }
-            }
-        }
-    } |
-    
     contract EasyTokenVault(@"getNonce", @address, ack) = {
         for(@nonceMap <<- nonceMapCh) {
             if(nonceMap.contains(address)) ack!((true, nonceMap.get(address)))
@@ -186,7 +105,6 @@ in {
     new
         revAddressCh,
         deployerId(`rho:rchain:deployerId`),
-        revAddressOps(`rho:rev:address`),
         stdout(`rho:io:stdout`)
     in {
         revAddressOps!("fromDeployerId", *deployerId, *revAddressCh) |
