@@ -54,16 +54,26 @@ new result, EasyTokenVault, balanceMapCh, nonceMapCh, verify, revAddressOps(`rho
     contract verify(@from, @to, @nonce, @amount, @pk, @sig, ack) = {
         for(@nonceMap <- nonceMapCh) {
             if(nonce == (nonceMap.get(from) + 1)) {
-                new hashOutCh, verifyRetCh in {
+                new hashOutCh, verifyRetCh, revAddrCh, addressVerifyCh in {
+                    revAddressOps!("fromPublicKey", pk.hexToBytes(), *revAddrCh) |
+                    for(@address <- revAddrCh) {
+                        match address {
+                            Nil => addressVerifyCh!(false)
+                            String => addressVerifyCh!(from == address)
+                        }
+                    } |
+
                     @"blake2b256Hash"!([nonce, amount, to].toByteArray(), *hashOutCh) |
                     for(@hash <- hashOutCh) {
-                        @"secp256k1Verify"!(hash, sig.hexToBytes(), pk, *verifyRetCh) |
-                        for(@r <- verifyRetCh) {
-                            if(r) {
-                                nonceMapCh!(nonceMap.set(from, nonce)) | ack!(true, "verify success")
-                            } else {
-                                nonceMapCh!(nonceMap) | ack!(false, "verify failed")
-                            }
+                        @"secp256k1Verify"!(hash, sig.hexToBytes(), pk, *verifyRetCh)
+                    } |
+
+
+                    for(@r <- verifyRetCh; @addressVerify <- addressVerifyCh) {
+                        if(r and addressVerify) {
+                            nonceMapCh!(nonceMap.set(from, nonce)) | ack!(true, "verify success")
+                        } else {
+                            nonceMapCh!(nonceMap) | ack!(false, "verify failed")
                         }
                     }
                 }
