@@ -8,6 +8,7 @@ logs/
 rchain/*
 !rchain/rnode-release
 !rchain/rnode0/genesis
+rnode.data.dir_IS_UNDEFINED/
 
 # 数据库文件
 src/database/

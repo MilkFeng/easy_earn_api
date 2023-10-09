@@ -1,0 +1,21 @@
+new result, EasyEarnTask, teskMapCh in {
+    contract EasyEarnTask(@"create", @username, @nonce, @hash, @pk, @sig, ack) = {
+
+    } |
+    contract EasyEarnTask(@"hide", @username, @nonce, @pk, @sig, ack) = {
+        
+    } |
+    contract EasyEarnTask(@"finish", @username, @nonce, @pk, @sig, ack) = {
+
+    } |
+    contract EasyEarnTask(@"find", @userId, @nonce, ack) = {
+
+    } |
+    contract EasyEarnTask(@"getNonce", @userId, ack) = {
+
+    } |
+    
+    teskMapCh!({})
+
+
+}
