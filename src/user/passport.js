@@ -74,8 +74,6 @@ passport.use(new JwtStrategy(jwtOptions, (jwtPayload, done) => {
   const userId = jwtPayload.userId;
   const username = jwtPayload.username;
 
-  console.log(userId);
-
   // 查询数据库以获取与令牌相关联的用户信息
   db.get('SELECT * FROM users WHERE id = ?', userId, (err, user) => {
     if(err) return done(err, false);

@@ -1,12 +1,11 @@
 const express = require('express');
-const { verifyRevAddr } = require('@tgrospic/rnode-grpc-js')
-const { create_wallet, find_wallet, get_balance } = require('./../common/rhoopt.js');
+const { create_wallet, find_wallet, get_balance, verify_address } = require('./../common/rhoopt.js');
 const rchainToolkit = require('@fabcotech/rchain-toolkit');
 
 // 创建一个路由
 const router = express.Router();
 
-const verify_address = (body, res) => {
+const verify_address_from_body = (body, res) => {
     let address;
     try {
         address = body.address;
@@ -17,14 +16,14 @@ const verify_address = (body, res) => {
     console.log(`get wallet address: ${address}`);
 
     // 检测地址是否合法
-    if(!verifyRevAddr(address)) {
+    if(!verify_address(address)) {
         res.status(400).send({ msg: "invalid address" });
         return null;
     }
     return address;
 };
 
-const verify_pk = (body, res) => {
+const verify_pk_from_body = (body, res) => {
     let pk;
     try {
         pk = body.pk;
@@ -47,7 +46,7 @@ const verify_pk = (body, res) => {
 // 创建钱包
 router.post('/create', async (req, res) => {
     // 创建一个新的钱包，这里需要客户端发送钱包地址
-    const pk = verify_pk(req.body, res);
+    const pk = verify_pk_from_body(req.body, res);
     if(pk == null) return ;
 
     const ret = await create_wallet(pk);
@@ -61,7 +60,7 @@ router.post('/create', async (req, res) => {
 // 查找钱包
 router.post('/find', async (req, res) => {
     // 查找钱包，这里需要客户端发送钱包地址
-    const address = verify_address(req.body, res);
+    const address = verify_address_from_body(req.body, res);
     if(address == null) return ;
 
     const ret = await find_wallet(rho_code, 0);

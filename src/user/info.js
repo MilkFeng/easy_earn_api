@@ -2,6 +2,8 @@ const express = require('express');
 const { passport, db } = require('./passport.js');
 const sqlite3 = require('sqlite3').verbose();
 
+const { verify_address } = require('../common/rhoopt.js')
+
 const router = express.Router();
 
 db.run(`CREATE TABLE IF NOT EXISTS wallet (
@@ -31,6 +33,8 @@ router.get('/get-wallets', passport.authenticate('jwt', { session: false }), (re
 router.post('/add-wallet', passport.authenticate('jwt', { session: false }), (req, res) => {
   const userId = req.user.id;
   const { address } = req.body;
+
+  if(!verify_address(address)) return res.status(400).send({ msg: 'Invalid address' });
 
   // 检查地址是否已存在
   db.get('SELECT id FROM wallet WHERE userId = ? AND address = ?', [userId, address], (err, row) => {
