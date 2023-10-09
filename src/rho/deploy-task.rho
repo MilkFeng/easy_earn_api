@@ -1,21 +1,19 @@
-new result, EasyEarnTask, teskMapCh in {
-    contract EasyEarnTask(@"create", @username, @nonce, @hash, @pk, @sig, ack) = {
+new result, EasyEarnTask, taskMapCh in {
+    contract EasyEarnTask(@"create", @nonce, @username, @hash, @deployerId, @key, ack) = {
 
     } |
-    contract EasyEarnTask(@"hide", @username, @nonce, @pk, @sig, ack) = {
+    contract EasyEarnTask(@"hide", @nonce, @deployerId, @key, ack) = {
         
     } |
     contract EasyEarnTask(@"finish", @username, @nonce, @pk, @sig, ack) = {
 
     } |
-    contract EasyEarnTask(@"find", @userId, @nonce, ack) = {
+    contract EasyEarnTask(@"find", @nonce, ack) = {
 
     } |
-    contract EasyEarnTask(@"getNonce", @userId, ack) = {
+    contract EasyEarnTask(@"getNonce", ack) = {
 
     } |
     
-    teskMapCh!({})
-
-
+    taskMapCh!({})
 }

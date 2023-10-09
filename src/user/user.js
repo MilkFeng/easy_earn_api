@@ -1,7 +1,6 @@
 const express = require('express');
-const { passport, secretKey, db } = require('./passport.js');
+const { passport, sign, db } = require('./passport.js');
 const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
 
 const router = express.Router();
 
@@ -44,7 +43,7 @@ router.post('/register', (req, res) => {
 // 用户登录路由，生成令牌
 router.post('/login', passport.authenticate('local', { session: false }), (req, res) => {
   // 身份验证成功，生成 JWT 令牌
-  const token = jwt.sign({ userId: req.user.id, username: req.user.username }, secretKey, { expiresIn: '1h' });
+  const token = sign({ userId: req.user.id, username: req.user.username }, { expiresIn: '1h' });
 
   // 返回令牌给客户端
   res.status(200).send({ token: token });
