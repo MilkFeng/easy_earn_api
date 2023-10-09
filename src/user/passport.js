@@ -1,7 +1,10 @@
 const passport = require('passport');
 const LocalStrategy = require('passport-local').Strategy;
+const JwtStrategy = require('passport-jwt').Strategy;
+const ExtractJwt = require('passport-jwt').ExtractJwt;
 const sqlite3 = require('sqlite3').verbose();
 const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 
 const secretKey = 'your_secret_key';
 
@@ -52,6 +55,41 @@ passport.deserializeUser((id, done) => {
       done(null, user);
     });
 });
+
+const jwtOptions = {
+  jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+  secretOrKey: secretKey, // 与生成令牌时使用的密钥一致
+};
+
+passport.use(new JwtStrategy(jwtOptions, (jwtPayload, done) => {
+  console.log("33333333333333333333333");
+  // 在这里验证 JWT 令牌，并在验证成功时调用 done
+  // jwtPayload 包含解码后的令牌信息
+
+  // 示例中的验证逻辑可能是：
+  // 1. 验证令牌是否过期
+  // 2. 验证令牌的签名是否有效
+
+
+  // 这里假设你的用户信息存储在数据库中，你需要使用 jwtPayload 中的信息查询用户
+  // 以下示例假设你的用户模型中有一个 id 字段用于标识用户
+  const userId = jwtPayload.id;
+  // 查询数据库以获取与令牌相关联的用户信息
+  db.get('SELECT * FROM users WHERE id = ?', userId, (err, user) => {
+    if (err) {
+      return done(err, false);
+    }
+
+    if (!user) {
+      return done(null, false);
+    }
+
+    // 如果验证成功，将用户信息传递给路由处理程序
+    return done(null, user);
+  });
+}));
+
+
 
 module.exports = { passport, secretKey, db };
 

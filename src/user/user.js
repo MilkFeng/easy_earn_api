@@ -50,5 +50,10 @@ router.post('/login', passport.authenticate('local', { session: false }), (req, 
   res.status(200).send({ token: token });
 });
 
+
+const info_router = require("./info.js");
+
+router.use("/info", info_router);
+
 module.exports = router;
 

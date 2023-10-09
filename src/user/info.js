@@ -7,7 +7,7 @@ const router = express.Router();
 db.run(`CREATE TABLE IF NOT EXISTS wallet (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   userId TEXT NOT NULL,
-  address TEXT NOT NULL,
+  address TEXT NOT NULL
 )`);
 
 router.get('/get-wallets', passport.authenticate('jwt', { session: false }), (req, res) => {
@@ -29,16 +29,46 @@ router.get('/get-wallets', passport.authenticate('jwt', { session: false }), (re
 
 // 添加钱包地址
 router.post('/add-wallet', passport.authenticate('jwt', { session: false }), (req, res) => {
-
   const userId = req.user.id;
+  const { address } = req.body;
 
   // 检查地址是否已存在
+  db.get('SELECT id FROM wallet WHERE userId = ? AND address = ?', [userId, address], (err, row) => {
+    if (err) {
+      return res.status(500).send({ msg: 'Internal Server Error' });
+    }
+
+    if (row) {
+      // 地址已存在
+      return res.status(400).send({ msg: 'Address already exists' });
+    }
+
+    // 插入新的钱包地址
+    db.run('INSERT INTO wallet (userId, address) VALUES (?, ?)', [userId, address], (err) => {
+      if (err) {
+        return res.status(500).send({ msg: 'Internal Server Error' });
+      }
+
+      return res.status(200).send({ msg: 'Address added successfully' });
+    });
+  });
 });
 
+
 // 删除钱包地址
+router.delete('/delete-wallet', passport.authenticate('jwt', { session: false }), (req, res) => {
+  const userId = req.user.id;
+  const { address } = req.body;
 
+  // 删除数据库中的钱包地址
+  db.run('DELETE FROM wallet WHERE userId = ? AND address = ?', [userId, address], (err) => {
+    if (err) {
+      return res.status(500).send({ msg: 'Internal Server Error' });
+    }
 
-// 获取钱包地址
+    return res.status(200).send({ msg: 'Address deleted successfully' });
+  });
+});
 
 
 
