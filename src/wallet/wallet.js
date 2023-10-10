@@ -5,6 +5,26 @@ const rchainToolkit = require('@fabcotech/rchain-toolkit');
 // 创建一个路由
 const router = express.Router();
 
+const verify_addresses_from_body = (body, res) => {
+    let addresses;
+    try {
+        addresses = body.addresses;
+    } catch (error) {
+        res.status(400).send({ msg: "invalid request body" });
+        return null;
+    }
+    console.log(`get wallet addresses: ${addresses}`);
+
+    // 检测地址是否合法
+    addresses.forEach(address => {
+        if(!verify_address(address)) {
+            res.status(400).send({ msg: "invalid address" });
+            return null;
+        }
+    });
+    return addresses;
+};
+
 const verify_address_from_body = (body, res) => {
     let address;
     try {
@@ -41,7 +61,7 @@ const verify_pk_from_body = (body, res) => {
     }
 
     return pk;
-}
+};
 
 // 创建钱包
 router.post('/create', async (req, res) => {
@@ -63,7 +83,7 @@ router.post('/find', async (req, res) => {
     const address = verify_address_from_body(req.body, res);
     if(address == null) return ;
 
-    const ret = await find_wallet(rho_code, 0);
+    const ret = await find_wallet(address);
 
     try {
         return res.status(200).send({ res: ret[0], address: ret[1] });
@@ -74,10 +94,10 @@ router.post('/find', async (req, res) => {
 
 // 检测钱包中的代币余额
 router.post('/balance', async (req, res) => {
-    const address = verify_address(req.body, res);
-    if(address == null) return ;
+    const addresses = verify_addresses_from_body(req.body, res);
+    if(addresses == null) return ;
 
-    const ret = await get_balance(rho_code, 0);
+    const ret = await get_balance(addresses);
 
     if(ret) {
         if(ret[0]) res.status(200).send({ msg: "get balance successfully", balance: ret[1] });

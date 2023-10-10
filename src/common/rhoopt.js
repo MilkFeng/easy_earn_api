@@ -3,7 +3,7 @@ const rchainToolkit = require('@fabcotech/rchain-toolkit');
 const { verifyRevAddr } = require('@tgrospic/rnode-grpc-js')
 
 // EasyToken 的地址
-const token_id = "rho:id:gzuh33orq3eouo9p4fzytcinwkr1tgc3wbdofo9dyr9yysu4nfnhwh";
+const token_id = "rho:id:d4p7xuksu3h4pdkrjg77g9sixmo4s8gxsbdta6ep3yzwhz9i6taezo";
 
 const create_wallet = async(pk) => {
     const rho_code = `new result, rl(\`rho:registry:lookup\`), vaultCh in {
@@ -25,11 +25,34 @@ const find_wallet = async(address) => {
     return await func_deploy(rho_code, 0);
 };
 
-const get_balance = async(address) => {
-    const rho_code = `new result, rl(\`rho:registry:lookup\`), vaultCh in {
+const get_balance = async(addresses) => {
+    const rho_code = `new result, rl(\`rho:registry:lookup\`), vaultCh, stdout(\`rho:io:stdout\`) in {
         rl!(\`${token_id}\`, *vaultCh) |
         for(vault <- vaultCh) {
-            vault!("balanceOf", "${address}", *result)
+            new iterator, retCh, listCh in {
+                for(@addresses <= iterator) {
+                    match addresses {
+                        [hd, ...tl] => {
+                            vault!("balanceOf", hd, *retCh) |
+                            for(@(suc, ret) <- retCh; @(_, list) <- listCh) {
+                                if(not suc) {
+                                    listCh!((false, ret)) |
+                                    iterator!([])
+                                } else {
+                                    listCh!((true, list ++ [ret])) |
+                                    iterator!(tl)
+                                }
+                            }
+                        } _ => {
+                            for(@ret <- listCh) {
+                                result!(ret)
+                            }
+                        }
+                    }
+                } |
+                iterator!([${addresses.map(x => `\"${x}\"`)}]) |
+                listCh!((true, []))
+            }
         }
     }`;
     return await func_deploy(rho_code, 0);

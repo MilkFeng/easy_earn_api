@@ -12,6 +12,11 @@ db.run(`CREATE TABLE IF NOT EXISTS wallet (
   address TEXT NOT NULL
 )`);
 
+router.get('/', passport.authenticate('jwt', { session: false }), (req, res) => {
+  const userId = req.user.id;
+  return res.status(200).send({ userId: userId });
+});
+
 router.get('/get-wallets', passport.authenticate('jwt', { session: false }), (req, res) => {
   const userId = req.user.id;
 
@@ -73,9 +78,6 @@ router.delete('/delete-wallet', passport.authenticate('jwt', { session: false })
     return res.status(200).send({ msg: 'Address deleted successfully' });
   });
 });
-
-
-
 
 module.exports = router;
 
