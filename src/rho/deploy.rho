@@ -202,13 +202,23 @@ new result, EasyEarnContract, verify, revAddressOps(`rho:rev:address`) in {
      * @param hash: String, 上传的哈希值
      * @param pk: String, 钱包的公钥
      * @param sig: String, 钱包的签名
-     * @param nonceMapCh: Name, 保存信息序号 Map 的信道
      *
      * @return (Boolean, String), 验证结果和信息
      */
     contract verifyUpload(@address, @nonce, @hash, @pk, @sig, ack) = {
       verify!(address, nonce, [nonce, hash].toByteArray(), pk, sig, *nonceMapCh, *ack)
     } |
+    /**
+     * 用来上传哈希值
+     *
+     * @param address: String, 钱包地址
+     * @param nonce: Int, 上传信息的信息序号
+     * @param hash: String, 上传的哈希值
+     * @param pk: String, 钱包的公钥
+     * @param sig: String, 钱包的签名
+     *
+     * @return (Boolean, String), 上传结果和信息
+     */
     contract EasyEarnContract(@"upload", @address, @nonce, @hash, @pk, @sig, ack) = {
       new ret, verifyCh in {
         // 查找钱包
