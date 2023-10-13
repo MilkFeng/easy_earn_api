@@ -9,7 +9,7 @@ const PUBLIC_KEY = rchainToolkit.utils.publicKeyFromPrivateKey(PRIVATE_KEY);
 const READ_ONLY_HOST = 'http://localhost:40403';
 const VALIDATOR_HOST = 'http://localhost:40403';
 const SHARD_ID = 'root';
-const WAITING_TIME = 5000;
+const WAITING_TIME = 1000;
 
 const func_deploy = async (rho_code_, order_) => {
 
@@ -71,7 +71,7 @@ const func_deploy = async (rho_code_, order_) => {
         console.log(err);
     };
 
-    await new Promise(resolve => setTimeout(resolve, WAITING_TIME));
+    // await new Promise(resolve => setTimeout(resolve, WAITING_TIME));
 
     console.log('propose success!');
 
