@@ -193,7 +193,7 @@ in {
         balanceMapCh!({ address: 10000000000 }) |
         nonceMapCh!({ address: -1 })
       }
-    } |
+    }
   } |
   /**
    * 哈希值上传与验证的智能合约
@@ -290,7 +290,7 @@ in {
     new revAddressCh, deployerId(`rho:rchain:deployerId`) in {
       revAddressOps!("fromDeployerId", *deployerId, *revAddressCh) |
       for(@address <- revAddressCh) {
-        infoNonceMapCh!({ address: -1 }) |
+        infoNonceMapCh!({ address: -1 })
       }
     } |
     hashMapCh!({})
