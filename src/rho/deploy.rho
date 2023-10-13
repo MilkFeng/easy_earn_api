@@ -1,0 +1,277 @@
+new result, EasyEarnContract, verify, revAddressOps(`rho:rev:address`) in {
+  /**
+   * 用来验证签名
+   *
+   * @param address: String, 钱包地址
+   * @param nonce: Int, 钱包的序号
+   * @param bytes: Array[Byte], 要签名的字节数组
+   * @param pk: String, 公钥
+   * @param sig: String, 签名
+   * @param nonceMapCh: Name, 保存钱包交易序号 Map 的信道
+   * @param ack: Name, 返回结果的信道
+   *
+   * @return (Boolean, String), 验证结果和信息
+   */
+  contract verify(@address, @nonce, @bytes, @pk, @sig, nonceMapCh, ack) = {
+    for(@nonceMap <- nonceMapCh) {
+      // 当前请求的交易序号应该是钱包的已完成的交易序号加一
+      if(nonce == (nonceMap.get(address) + 1)) {
+        new hashOutCh, verifyRetCh, revAddrCh, addressVerifyCh in {
+          // 验证钱包地址是否与公钥匹配
+          revAddressOps!("fromPublicKey", pk.hexToBytes(), *revAddrCh) |
+          for(@retAddress <- revAddrCh) {
+            match retAddress {
+              Nil => addressVerifyCh!(false)
+              String => addressVerifyCh!(retAddress == address)
+            }
+          } |
+          
+          // 验证签名
+          @"blake2b256Hash"!(bytes, *hashOutCh) |
+          for(@hash <- hashOutCh) {
+            @"secp256k1Verify"!(hash, sig.hexToBytes(), pk, *verifyRetCh)
+          } |
+
+          // 返回结果
+          for(@r <- verifyRetCh; @addressVerify <- addressVerifyCh) {
+            if(r and addressVerify) {
+              nonceMapCh!(nonceMap.set(address, nonce)) | ack!(true, "verify success")
+            } else {
+              nonceMapCh!(nonceMap) | ack!(false, "verify failed")
+            }
+          }
+        }
+      } else {
+        nonceMapCh!(nonceMap) | ack!(false, "nonce not match")
+      }
+    }
+  } |
+  /**
+   * 钱包相关的智能合约
+   */
+  new verifyTransfer, balanceMapCh, nonceMapCh in {
+    /**
+     * 用来查找钱包
+     *
+     * @param address: String, 钱包地址
+     * @param ack: Name, 返回结果的信道
+     *
+     * @return (Boolean, String), 查找结果和信息
+     */
+    contract EasyEarnContract(@"find", @address, ack) = {
+      for(@balanceMap <<- balanceMapCh; @nonceMap <<- nonceMapCh) {
+        if(balanceMap.contains(address) and nonceMap.contains(address)) { ack!((true, address)) }
+        else { ack!((false, "wallet not found")) }
+      }
+    } |
+    /**
+     * 用来创建钱包
+     *
+     * @param pk: String, 公钥
+     * @param ack: Name, 返回结果的信道
+     *
+     * @return (Boolean, String), 创建结果和信息
+     */
+    contract EasyEarnContract(@"create", @pk, ack) = {
+      new revAddrCh in {
+        // 通过公钥生成钱包地址
+        revAddressOps!("fromPublicKey", pk.hexToBytes(), *revAddrCh) |
+        for(@address <- revAddrCh) {
+          match address {
+            Nil => ack!((false, "invalid public key"))
+            String => {
+              for(@balanceMap <- balanceMapCh; @nonceMap <- nonceMapCh) {
+                // 钱包地址和交易序号都不存在时，创建钱包，否则返回错误信息
+                if(balanceMap.contains(address) and nonceMap.contains(address)) {
+                  ack!((false, "wallet already exists"))
+                } else {
+                  balanceMapCh!(balanceMap.union({ address: 0 })) |
+                  nonceMapCh!(nonceMap.union({ address: -1 })) |
+                  ack!((true, address))
+                }
+              }
+            }
+          }
+        }
+      }
+    } |
+    /**
+     * 用来查找钱包的交易序号
+     *
+     * @param address: String, 钱包地址
+     * @param ack: Name, 返回结果的信道
+     *
+     * @return (Boolean, String), 查找结果和信息
+     */
+    contract EasyEarnContract(@"nonceOf", @address, ack) = {
+      for(@nonceMap <<- nonceMapCh) {
+        if(nonceMap.contains(address)) { ack!((true, nonceMap.get(address))) }
+        else { ack!((false, "wallet not found")) }
+      }
+    } |
+    /**
+     * 用来查找钱包的余额
+     *
+     * @param address: String, 钱包地址
+     * @param ack: Name, 返回结果的信道
+     *
+     * @return (Boolean, String), 查找结果和信息
+     */
+    contract EasyEarnContract(@"balanceOf", @address, ack) = {
+      for(@balanceMap <<- balanceMapCh) {
+        if(balanceMap.contains(address)) { ack!((true, balanceMap.get(address))) }
+        else { ack!((false, "wallet not found")) }
+      }
+    } |
+    /**
+     * 用来验证转账信息的签名
+     *
+     * @param from: String, 转账方钱包地址
+     * @param to: String, 收款方钱包地址
+     * @param nonce: Int, 转账方钱包的交易序号
+     * @param amount: Int, 转账金额
+     * @param pk: String, 转账方钱包的公钥
+     * @param sig: String, 转账方钱包的签名
+     * @param ack: Name, 返回结果的信道
+     *
+     * @return (Boolean, String), 验证结果和信息
+     */
+    contract verifyTransfer(@from, @to, @nonce, @amount, @pk, @sig, ack) = {
+      verify!(from, nonce, [nonce, amount, to].toByteArray(), pk, sig, *nonceMapCh, *ack)
+    } |
+    /**
+     * 用来转账
+     *
+     * @param from: String, 转账方钱包地址
+     * @param to: String, 收款方钱包地址
+     * @param nonce: Int, 转账方钱包的交易序号
+     * @param amount: Int, 转账金额
+     * @param pk: String, 转账方钱包的公钥
+     * @param sig: String, 转账方钱包的签名
+     * @param ack: Name, 返回结果的信道
+     *
+     * @return (Boolean, String), 转账结果和信息
+     */
+    contract EasyEarnContract(@"transfer", @from, @to, @nonce, @amount, @pk, @sig, ack) = {
+      new retFromCh, retToCh, verifyCh in {
+        // 查找转账方和收款方钱包
+        EasyEarnContract!("find", from, *retFromCh) |
+        EasyEarnContract!("find", to, *retToCh) |
+        for(@(successFrom, _) <- retFromCh; @(successTo, _) <- retToCh) {
+          // 验证转账方和收款方钱包是否存在
+          if((not successFrom) or (not successTo)) { ack!((false, "wallet not found")) }
+          else {
+            // 验证转账签名
+            verifyTransfer!(from, to, nonce, amount, pk, sig, *nonceMapCh, *verifyCh) |
+            for(@(success, ret) <- verifyCh) {
+              if(success) {
+                for(@balanceMap <<- balanceMapCh) {
+                  // 转账方余额不足时，返回错误信息
+                  if(balanceMap.get(from) - amount < 0) { ack!((false, "overdraft")) }
+                  else {
+                    balanceMapCh!(balanceMap.set(from, balanceMap.get(from) - amount).set(to, balanceMap.get(to) + amount)) |
+                    ack!((true, "transfer success"))
+                  }
+                }
+              } else { ack!((false, ret)) }
+            }
+          }
+        }
+      }
+    } |
+    /**
+     * 初始化钱包，给部署者发钱
+     */
+    new revAddressCh, deployerId(`rho:rchain:deployerId`) in {
+      revAddressOps!("fromDeployerId", *deployerId, *revAddressCh) |
+      for(@address <- revAddressCh) {
+        balanceMapCh!({ address: 10000000000 }) |
+        nonceMapCh!({ address: -1 })
+      }
+    }
+  } |
+  /**
+   * 哈希值上传与验证的智能合约
+   */
+  new verifyUpload, nonceMapCh, hashMapCh in {
+    /**
+     * 用来验证上传的哈希值
+     *
+     * @param address: String, 钱包地址
+     * @param nonce: Int, 上传信息的信息序号
+     * @param hash: String, 上传的哈希值
+     * @param pk: String, 钱包的公钥
+     * @param sig: String, 钱包的签名
+     * @param nonceMapCh: Name, 保存信息序号 Map 的信道
+     *
+     * @return (Boolean, String), 验证结果和信息
+     */
+    contract verifyUpload(@address, @nonce, @hash, @pk, @sig, ack) = {
+      verify!(address, nonce, [nonce, hash].toByteArray(), pk, sig, *nonceMapCh, *ack)
+    } |
+    contract EasyEarnContract(@"upload", @address, @nonce, @hash, @pk, @sig, ack) = {
+      new ret, verifyCh in {
+        // 查找钱包
+        EasyEarnContract!("find", address, *ret) |
+        for(@(suc, _) <- ret) {
+          if(not suc) { ack!((false, "wallet not found")) }
+          else {
+            // 验证签名
+            verifyUpload!(address, nonce, hash, pk, sig, *verifyCh) |
+            for(@(suc, ret) <- verifyCh) {
+              if(not suc) { ack!((false, ret)) }
+              else {
+                // 保存哈希值
+                for(@hashMap <- hashMapCh) {
+                  hashMapCh!(hashMap.union({ (address, nonce): hash }))
+                } |
+                ack!((true, "upload success"))
+              }
+            }
+          }
+        }
+      }
+    } |
+    /**
+     * 用来查找上传的哈希值
+     *
+     * @param address: String, 钱包地址
+     * @param nonce: Int, 上传信息的信息序号
+     * @param ack: Name, 返回结果的信道
+     *
+     * @return (Boolean, String), 查找结果和信息
+     */
+    contract EasyEarnContract(@"check", @address, @nonce, ack) = {
+      for(@hashMap <- hashMapCh) {
+        if(hashMap.contains((address, nonce))) { ack!((true, hashMap.get((address, nonce)))) }
+        else { ack!((false, "hash not found")) }
+      }
+    } |
+    /**
+     * 用来查找钱包的信息序号
+     * 
+     * @param address: String, 钱包地址
+     * @param ack: Name, 返回结果的信道
+     *
+     * @return (Boolean, String), 查找结果和信息
+     */
+    contract EasyEarnContract(@"infoNonceOf", @address, ack) = {
+      for(@nonceMap <<- nonceMapCh) {
+        if(nonceMap.contains(address)) { ack!((true, nonceMap.get(address))) }
+        else { ack!((false, "wallet not found")) }
+      }
+    } |
+    /*
+     * 初始化
+     */
+    nonceMapCh!({}) |
+    hashMapCh!({})
+  } |
+  
+  /**
+   * 将部署的智能合约注册到 rchain 中
+   */
+  new ri(`rho:registry:insertArbitrary`) in {
+    ri!(bundle+ {*EasyEarnContract}, *result)
+  }
+}

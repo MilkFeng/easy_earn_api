@@ -62,7 +62,7 @@ const get_nonce = async(address) => {
     const rho_code = `new result, rl(\`rho:registry:lookup\`), vaultCh in {
         rl!(\`${token_id}\`, *vaultCh) |
         for(vault <- vaultCh) {
-            vault!("getNonce", "${address}", *result)
+            vault!("nonceOf", "${address}", *result)
         }
     }`;
     return await func_deploy(rho_code, 0);
