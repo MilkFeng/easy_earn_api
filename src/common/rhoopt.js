@@ -72,7 +72,7 @@ const transfer = async(nonce, from, to, amount, pk, sig) => {
     const rho_code = `new result, rl(\`rho:registry:lookup\`), vaultCh in {
         rl!(\`${token_id}\`, *vaultCh) |
         for(vault <- vaultCh) {
-            vault!("transfer", "${from}", "${to}", ${nonce}, ${amount}, "${pk}", "${sib}", *result)
+            vault!("transfer", "${from}", "${to}", ${nonce}, ${amount}, "${pk}", "${sig}", *result)
         }
     }`;
     return await func_deploy(rho_code, 0);
