@@ -5,69 +5,58 @@ const rchainToolkit = require('@fabcotech/rchain-toolkit');
 // 创建一个路由
 const router = express.Router();
 
-const verify_addresses_from_body = (body, res) => {
-    let addresses;
-    try {
-        addresses = body.addresses;
-    } catch (error) {
-        res.status(400).send({ msg: "invalid request body" });
-        return null;
-    }
-    console.log(`get wallet addresses: ${addresses}`);
-
-    // 检测地址是否合法
-    addresses.forEach(address => {
-        if(!verify_address(address)) {
-            res.status(400).send({ msg: "invalid address" });
+const verify_body = (body, keys, res) => {
+    let map = {};
+    keys.forEach(key => {
+        if(!key in body) {
+            res.status(400).send({ msg: "invalid request body" });
             return null;
         }
+        console.log("get " + key + ": " + body[key]);
+        let validate = (_) => true;
+        switch(key) {
+            case 'pk':
+                validate = (pk) => {
+                    try {
+                        rchainToolkit.utils.revAddressFromPublicKey(pk);
+                        return true;
+                    } catch(err) {
+                        return false;
+                    }
+                };
+                break;
+            
+            case 'address':
+                validate = verify_address;
+                break;
+            
+            case 'addresses':
+                validate = (addresses) => {
+                    addresses.forEach(address => {
+                        if(!verify_address(address)) return false;
+                    });
+                    return true;
+                };
+                break;
+            
+            default:
+                break;
+        };
+        if(!validate(body[key])) {
+            res.status(400).send({ msg: "invalid " + key });
+            return null;
+        }
+        map[key] = body[key];
     });
-    return addresses;
-};
-
-const verify_address_from_body = (body, res) => {
-    let address;
-    try {
-        address = body.address;
-    } catch (error) {
-        res.status(400).send({ msg: "invalid request body" });
-        return null;
-    }
-    console.log(`get wallet address: ${address}`);
-
-    // 检测地址是否合法
-    if(!verify_address(address)) {
-        res.status(400).send({ msg: "invalid address" });
-        return null;
-    }
-    return address;
-};
-
-const verify_pk_from_body = (body, res) => {
-    let pk;
-    try {
-        pk = body.pk;
-    } catch (error) {
-        res.status(400).send({ msg: "invalid request body" });
-        return null;
-    }
-    console.log(`get pk: ${pk}`);
-
-    try {
-        rchainToolkit.utils.revAddressFromPublicKey(pk);
-    } catch(err) {
-        res.status(400).send({ msg: "invalid public key" });
-        return null;
-    }
-
-    return pk;
+    return map;
 };
 
 // 创建钱包
 router.post('/create', async (req, res) => {
     // 创建一个新的钱包，这里需要客户端发送钱包地址
-    const pk = verify_pk_from_body(req.body, res);
-    if(pk == null) return ;
+    const mp = verify_body(req.body, ["pk"], res);
+    if(mp == null) return ;
+    const { pk } = mp;
 
     const ret = await create_wallet(pk);
 
@@ -80,8 +69,9 @@ router.post('/create', async (req, res) => {
 // 查找钱包
 router.post('/find', async (req, res) => {
     // 查找钱包，这里需要客户端发送钱包地址
-    const address = verify_address_from_body(req.body, res);
-    if(address == null) return ;
+    const mp = verify_body(req.body, ["address"], res);
+    if(mp == null) return ;
+    const { address } = mp;
 
     const ret = await find_wallet(address);
 
@@ -94,8 +84,9 @@ router.post('/find', async (req, res) => {
 
 // 检测钱包中的代币余额
 router.post('/balance', async (req, res) => {
-    const addresses = verify_addresses_from_body(req.body, res);
-    if(addresses == null) return ;
+    const mp = verify_body(req.body, ["addresses"], res);
+    if(mp == null) return ;
+    const { addresses } = mp;
 
     const ret = await get_balance(addresses);
 
