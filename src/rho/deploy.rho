@@ -1,8 +1,9 @@
 new 
-  result, EasyEarnContract,
-  verify, nonceMapCh,
-  taskNonceMapCh, recordNonceMapCh,
-  revAddressOps(`rho:rev:address`)
+  result, EasyEarnContract, verify,
+  transferNonceMapCh, taskNonceMapCh, recordNonceMapCh,
+  revAddressOps(`rho:rev:address`),
+  blake2b256HashOps(`rho:crypto:blake2b256Hash`),
+  secp256k1VerifyOps(`rho:crypto:secp256k1Verify`)
 in {
   /**
    * 用来验证签名
@@ -20,35 +21,39 @@ in {
   contract verify(@address, @nonce, @bytes, @pk, @sig, nonceMapCh, ack) = {
     for(@nonceMap <- nonceMapCh) {
       // 当前请求的交易序号应该是钱包的已完成的交易序号加一
-      if(nonce == (nonceMap.get(address) + 1)) {
-        new hashOutCh, verifyRetCh, revAddrCh, addressVerifyCh in {
-          // 验证钱包地址是否与公钥匹配
-          revAddressOps!("fromPublicKey", pk.hexToBytes(), *revAddrCh) |
-          for(@retAddress <- revAddrCh) {
-            match retAddress {
-              Nil => addressVerifyCh!(false)
-              String => addressVerifyCh!(retAddress == address)
-            }
-          } |
-          
-          // 验证签名
-          @"blake2b256Hash"!(bytes, *hashOutCh) |
-          for(@hash <- hashOutCh) {
-            @"secp256k1Verify"!(hash, sig.hexToBytes(), pk, *verifyRetCh)
-          } |
+      if(not nonceMap.contains(address)) { ack!((false, "cannot find wallet")) }
+      else {
+        if(nonce == (nonceMap.get(address) + 1)) {
+          new hashOutCh, verifyRetCh, revAddrCh, addressVerifyCh in {
+            // 验证钱包地址是否与公钥匹配
+            revAddressOps!("fromPublicKey", pk.hexToBytes(), *revAddrCh) |
+            for(@retAddress <- revAddrCh) {
+              match retAddress {
+                String => addressVerifyCh!(retAddress == address)
+                _ => addressVerifyCh!(false)
+              }
+            } |
+            
+            // 验证签名
+            blake2b256HashOps!(bytes, *hashOutCh) |
+            for(@hash <- hashOutCh) {
+              secp256k1VerifyOps!(hash, sig.hexToBytes(), pk.hexToBytes(), *verifyRetCh)
+            } |
 
-          // 返回结果
-          for(@r <- verifyRetCh; @addressVerify <- addressVerifyCh) {
-            if(r and addressVerify) {
-              nonceMapCh!(nonceMap.set(address, nonce)) | ack!(true, "verify success")
-            } else {
-              nonceMapCh!(nonceMap) | ack!(false, "verify failed")
+            // 返回结果
+            for(@r <- verifyRetCh; @addressVerify <- addressVerifyCh) {
+              if(r and addressVerify) {
+                nonceMapCh!(nonceMap.set(address, nonce)) | ack!((true, "verify success"))
+              } else {
+                nonceMapCh!(nonceMap) | ack!((false, "verify failed"))
+              }
             }
           }
+        } else {
+          nonceMapCh!(nonceMap) | ack!((false, "nonce not match"))
         }
-      } else {
-        nonceMapCh!(nonceMap) | ack!(false, "nonce not match")
       }
+      
     }
   } |
   /**
@@ -64,8 +69,8 @@ in {
      * @return (Boolean, String), 查找结果和信息
      */
     contract EasyEarnContract(@"find", @address, ack) = {
-      for(@balanceMap <<- balanceMapCh; @nonceMap <<- nonceMapCh) {
-        if(balanceMap.contains(address) and nonceMap.contains(address)) { ack!((true, address)) }
+      for(@balanceMap <<- balanceMapCh) {
+        if(balanceMap.contains(address)) { ack!((true, address)) }
         else { ack!((false, "wallet not found")) }
       }
     } |
@@ -85,13 +90,13 @@ in {
           match address {
             Nil => ack!((false, "invalid public key"))
             String => {
-              for(@balanceMap <- balanceMapCh; @nonceMap <- nonceMapCh; @taskNonceMap <- taskNonceMapCh; @recordNonceMap <- recordNonceMapCh) {
+              for(@balanceMap <- balanceMapCh; @transferNonceMap <- transferNonceMapCh; @taskNonceMap <- taskNonceMapCh; @recordNonceMap <- recordNonceMapCh) {
                 // 钱包地址和交易序号都不存在时，创建钱包，否则返回错误信息
-                if(balanceMap.contains(address) and nonceMap.contains(address)) {
+                if(balanceMap.contains(address) and transferNonceMap.contains(address)) {
                   ack!((false, "wallet already exists"))
                 } else {
                   balanceMapCh!(balanceMap.union({ address: 0 })) |
-                  nonceMapCh!(nonceMap.union({ address: -1 })) |
+                  transferNonceMapCh!(transferNonceMap.union({ address: -1 })) |
                   taskNonceMapCh!(taskNonceMap.union({ address: -1 })) |
                   recordNonceMapCh!(recordNonceMap.union({ address: -1 })) |
                   ack!((true, address))
@@ -111,8 +116,8 @@ in {
      * @return (Boolean, String), 查找结果和信息
      */
     contract EasyEarnContract(@"nonceOf", @address, ack) = {
-      for(@nonceMap <<- nonceMapCh) {
-        if(nonceMap.contains(address)) { ack!((true, nonceMap.get(address))) }
+      for(@transferNonceMap <<- transferNonceMapCh) {
+        if(transferNonceMap.contains(address)) { ack!((true, transferNonceMap.get(address))) }
         else { ack!((false, "wallet not found")) }
       }
     } |
@@ -144,7 +149,11 @@ in {
      * @return (Boolean, String), 验证结果和信息
      */
     contract verifyTransfer(@from, @to, @nonce, @amount, @pk, @sig, ack) = {
-      verify!(from, nonce, [nonce, amount, to].toByteArray(), pk, sig, *nonceMapCh, *ack)
+      if(amount <= 0) { ack!((false, "amount must be positive")) }
+      else {
+        if(from == to) { ack!((false, "cannot transfer between two same address")) }
+        else { verify!(from, nonce, [nonce, amount, to].toByteArray(), pk, sig, *transferNonceMapCh, *ack) }
+      }
     } |
     /**
      * 用来转账
@@ -169,7 +178,7 @@ in {
           if((not successFrom) or (not successTo)) { ack!((false, "wallet not found")) }
           else {
             // 验证转账签名
-            verifyTransfer!(from, to, nonce, amount, pk, sig, *nonceMapCh, *verifyCh) |
+            verifyTransfer!(from, to, nonce, amount, pk, sig, *verifyCh) |
             for(@(success, ret) <- verifyCh) {
               if(success) {
                 for(@balanceMap <- balanceMapCh) {
@@ -195,7 +204,7 @@ in {
       revAddressOps!("fromDeployerId", *deployerId, *revAddressCh) |
       for(@address <- revAddressCh) {
         balanceMapCh!({ address: 10000000000 }) |
-        nonceMapCh!({ address: -1 }) |
+        transferNonceMapCh!({ address: -1 }) |
         taskNonceMapCh!({ address: -1 }) |
         recordNonceMapCh!({ address: -1 })
       }

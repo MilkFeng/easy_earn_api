@@ -5,7 +5,7 @@ const deploy_easy_token = async() => {
     const token_id = await func_deploy_fromfile("src/rho/deploy.rho", 0);
 
     // token id
-    console.log("token id: " + token_id);
+    console.log("contract id: " + token_id);
 };
 
 deploy_easy_token();

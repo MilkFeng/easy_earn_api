@@ -3,11 +3,11 @@ const rchainToolkit = require('@fabcotech/rchain-toolkit');
 const { verifyRevAddr } = require('@tgrospic/rnode-grpc-js')
 
 // EasyToken 的地址
-const token_id = "rho:id:d4p7xuksu3h4pdkrjg77g9sixmo4s8gxsbdta6ep3yzwhz9i6taezo";
+const contract_id = "rho:id:on34ejhd6jijn5wu9ozojmtect6trh8bouwdkbtyo6sgnmzsc1urbm";
 
 const create_wallet = async(pk) => {
     const rho_code = `new result, rl(\`rho:registry:lookup\`), vaultCh in {
-        rl!(\`${token_id}\`, *vaultCh) |
+        rl!(\`${contract_id}\`, *vaultCh) |
         for(vault <- vaultCh) {
             vault!("create", "${pk}", *result)
         }
@@ -17,7 +17,7 @@ const create_wallet = async(pk) => {
 
 const find_wallet = async(address) => {
     const rho_code = `new result, rl(\`rho:registry:lookup\`), vaultCh in {
-        rl!(\`${token_id}\`, *vaultCh) |
+        rl!(\`${contract_id}\`, *vaultCh) |
         for(vault <- vaultCh) {
             vault!("find", "${address}", *result)
         }
@@ -27,7 +27,7 @@ const find_wallet = async(address) => {
 
 const get_balance = async(addresses) => {
     const rho_code = `new result, rl(\`rho:registry:lookup\`), vaultCh, stdout(\`rho:io:stdout\`) in {
-        rl!(\`${token_id}\`, *vaultCh) |
+        rl!(\`${contract_id}\`, *vaultCh) |
         for(vault <- vaultCh) {
             new iterator, retCh, listCh in {
                 for(@addresses <= iterator) {
@@ -60,7 +60,7 @@ const get_balance = async(addresses) => {
 
 const get_nonce = async(address) => {
     const rho_code = `new result, rl(\`rho:registry:lookup\`), vaultCh in {
-        rl!(\`${token_id}\`, *vaultCh) |
+        rl!(\`${contract_id}\`, *vaultCh) |
         for(vault <- vaultCh) {
             vault!("nonceOf", "${address}", *result)
         }
@@ -68,13 +68,14 @@ const get_nonce = async(address) => {
     return await func_deploy(rho_code, 0);
 };
 
-const transfer = async(nonce, from, to, amount, pk, sig) => {
+const transfer = async(from, to, nonce, amount, pk, sig) => {
     const rho_code = `new result, rl(\`rho:registry:lookup\`), vaultCh in {
-        rl!(\`${token_id}\`, *vaultCh) |
+        rl!(\`${contract_id}\`, *vaultCh) |
         for(vault <- vaultCh) {
             vault!("transfer", "${from}", "${to}", ${nonce}, ${amount}, "${pk}", "${sig}", *result)
         }
     }`;
+
     return await func_deploy(rho_code, 0);
 };
 
