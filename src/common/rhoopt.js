@@ -1,32 +1,28 @@
 const { func_deploy, func_deploy_fromfile } = require('./deploy.js');
-const rchainToolkit = require('@fabcotech/rchain-toolkit');
 const { verifyRevAddr } = require('@tgrospic/rnode-grpc-js')
 
 // 将 contract id 粘贴到这里
 const contract_id = "rho:id:on34ejhd6jijn5wu9ozojmtect6trh8bouwdkbtyo6sgnmzsc1urbm";
 
-const create_wallet = async(pk) => {
-    const rho_code = `new result, rl(\`rho:registry:lookup\`), vaultCh in {
+const run_with_full_code = async (code) => await func_deploy(code, 0);
+
+const run_with_name_and_args = async (name, args) => await run_with_full_code(
+    `new result, rl(\`rho:registry:lookup\`), vaultCh in {
         rl!(\`${contract_id}\`, *vaultCh) |
         for(vault <- vaultCh) {
-            vault!("create", "${pk}", *result)
+            vault!("${name}", ${args}, *result)
         }
-    }`;
-    return await func_deploy(rho_code, 0);
-};
+    }`);
 
-const find_wallet = async(address) => {
-    const rho_code = `new result, rl(\`rho:registry:lookup\`), vaultCh in {
-        rl!(\`${contract_id}\`, *vaultCh) |
-        for(vault <- vaultCh) {
-            vault!("find", "${address}", *result)
-        }
-    }`;
-    return await func_deploy(rho_code, 0);
-};
+// 创建钱包
+const create_wallet = async (pk) => await run_with_name_and_args("create", `"${pk}"`);
 
-const get_balance = async(addresses) => {
-    const rho_code = `new result, rl(\`rho:registry:lookup\`), vaultCh, stdout(\`rho:io:stdout\`) in {
+// 查找钱包
+const find_wallet = async (address) => await run_with_name_and_args("find", `"${address}"`);
+
+// 获取钱包余额
+const get_balance = async (addresses) => await run_with_full_code(
+    `new result, rl(\`rho:registry:lookup\`), vaultCh, stdout(\`rho:io:stdout\`) in {
         rl!(\`${contract_id}\`, *vaultCh) |
         for(vault <- vaultCh) {
             new iterator, retCh, listCh in {
@@ -54,32 +50,29 @@ const get_balance = async(addresses) => {
                 listCh!((true, []))
             }
         }
-    }`;
-    return await func_deploy(rho_code, 0);
-};
+    }`);
 
-const get_nonce = async(address) => {
-    const rho_code = `new result, rl(\`rho:registry:lookup\`), vaultCh in {
-        rl!(\`${contract_id}\`, *vaultCh) |
-        for(vault <- vaultCh) {
-            vault!("nonceOf", "${address}", *result)
-        }
-    }`;
-    return await func_deploy(rho_code, 0);
-};
+// 获取交易序号
+const get_nonce = async (address) => await run_with_name_and_args("nonceOf", `"${address}"`);
 
-const transfer = async(from, to, nonce, amount, pk, sig) => {
-    const rho_code = `new result, rl(\`rho:registry:lookup\`), vaultCh in {
-        rl!(\`${contract_id}\`, *vaultCh) |
-        for(vault <- vaultCh) {
-            vault!("transfer", "${from}", "${to}", ${nonce}, ${amount}, "${pk}", "${sig}", *result)
-        }
-    }`;
+// 交易
+const transfer = async (from, to, nonce, amount, pk, sig) => await run_with_name_and_args("transfer", `"${from}", "${to}", ${nonce}, ${amount}, "${pk}", "${sig}"`);
 
-    return await func_deploy(rho_code, 0);
-};
-
+// 验证钱包地址的合法性
 const verify_address = verifyRevAddr;
+
+
+// 获取任务序号
+const get_task_nonce = async (address) => await run_with_name_and_args("taskNonceOf", `"${address}"`);
+
+// 获取提交序号
+const get_record_nonce = async (address) => await run_with_name_and_args("recordNonceOf", `"${address}"`);
+
+// 获取任务的哈希值和状态
+const get_task = async (address, nonce) => await run_with_name_and_args("taskOf", `"${address}", ${nonce}`);
+
+// 获取提交记录的哈希值
+const get_record = async (address, nonce) => await run_with_name_and_args("recordOf", `"${address}", ${nonce}`);
 
 module.exports = {
     create_wallet,
@@ -88,4 +81,9 @@ module.exports = {
     get_nonce,
     transfer,
     verify_address,
+
+    get_task_nonce,
+    get_record_nonce,
+    get_task,
+    get_record,
 };

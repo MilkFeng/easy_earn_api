@@ -1,0 +1,3 @@
+new ch, stdout(`rho:io:stdout`) in {
+    stdout!(1.0)
+}

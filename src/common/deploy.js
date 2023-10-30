@@ -40,17 +40,15 @@ const func_deploy = async (rho_code_, order_) => {
         "http://localhost:40403"
     );
 
-    const deployOptions = rchainToolkit.utils.getDeployOptions(
-        {
-            timestamp: _timestamp,
-            term: rho_code_,
-            shardId: SHARD_ID,
-            privateKey: PRIVATE_KEY,
-            phloPrice: 1,
-            phloLimit: 100000000,
-            validAfterBlockNumber: _validAfterBlockNumber || -1
-        }
-    );
+    const deployOptions = rchainToolkit.utils.getDeployOptions({
+        timestamp: _timestamp,
+        term: rho_code_,
+        shardId: SHARD_ID,
+        privateKey: PRIVATE_KEY,
+        phloPrice: 1,
+        phloLimit: 100000000,
+        validAfterBlockNumber: _validAfterBlockNumber || -1
+    });
 
     let deployResponse;
     try {
@@ -58,9 +56,9 @@ const func_deploy = async (rho_code_, order_) => {
             "http://localhost:40403",
             deployOptions
         );
-    } catch (err) {
-        console.log(err);
-    };
+    } catch(error) {
+        console.log(error);
+    }
 
     console.log('deploy response: ' + deployResponse);
 

@@ -41,11 +41,17 @@ console.error = logger.error.bind(logger);
 // morgan日志组件，用于记录HTTP请求
 app.use(morgan(
     'short', {
-        stream: {
-            write: message => logger.info(message.trim()),
-        },
+    stream: {
+        write: message => logger.info(message.trim()),
     },
+},
 ));
+
+// 处理异常
+app.use((err, req, res, next) => {
+    console.error(err); // 记录异常信息，可以根据需要进行日志记录
+    res.status(500).json({ error: 'Internal Server Error' }); // 返回一个适当的错误响应
+});
 
 // 引入路由
 const wallet_router = require('./src/wallet/wallet.js');
