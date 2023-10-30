@@ -49,11 +49,14 @@ app.use(morgan(
 
 // 引入路由
 const wallet_router = require('./src/wallet/wallet.js');
-const user_router = require('./src/user/user.js');
+const auth_router = require('./src/user/auth.js');
+const user_router = require("./src/user/user.js");
 
 // 使用路由
 app.use('/wallet', wallet_router);
-app.use('/user', user_router);
+app.use('/auth', auth_router);
+app.use("/user", user_router);
+
 
 // 检测服务器连接状况
 app.get('/', (req, res) => {

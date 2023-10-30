@@ -1,57 +1,78 @@
 const express = require('express');
-const { passport, sign, db } = require('./passport.js');
-const bcrypt = require('bcrypt');
+const { passport, db } = require('./passport.js');
+const sqlite3 = require('sqlite3').verbose();
+
+const { verify_address } = require('../common/rhoopt.js')
 
 const router = express.Router();
 
-router.post('/register', (req, res) => {
-  const { username, password } = req.body;
+db.run(`CREATE TABLE IF NOT EXISTS wallet (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userId TEXT NOT NULL,
+  address TEXT NOT NULL
+)`);
 
-  // 检查用户名是否已存在
-  db.get('SELECT id, username, password FROM users WHERE username = ?', username, (err, existingUser) => {
+router.get('/get-wallets', passport.authenticate('jwt', { session: false }), (req, res) => {
+  const userId = req.user.id;
+
+  // 使用 userId 查询数据库，获取关联的所有地址
+  db.all('SELECT address FROM wallet WHERE userId = ?', userId, (err, rows) => {
     if (err) {
-      // 处理数据库查询错误
-      return res.status(500).send({msg: 'Internal Server Error'});
-    }
-    
-    if (existingUser) {
-      // 用户名已存在
-      return res.status(400).send({msg:'Username already exists'});
+      return res.status(500).send({ msg: 'Internal Server Error' });
     }
 
-    // 用户名可用，将密码哈希存储到数据库
-    bcrypt.hash(password, 10, (err, hashedPassword) => {
-        if (err) {
-          // 处理密码哈希错误
-          return res.status(500).send({ msg: 'Internal Server Error' });
-        }
-      
-        // 插入新用户记录到数据库，不需要指定 id
-        db.run('INSERT INTO users (username, password) VALUES (?, ?)', [username, hashedPassword], (err) => {
-          if (err) {
-            // 处理数据库插入错误
-            return res.status(500).send({ msg: 'Internal Server Error'});
-          }
-      
-          // 注册成功
-          return res.status(200).send({ msg: 'Registion Success' });
-        });
-    });     
+    // 从查询结果中提取地址
+    const addresses = rows.map(row => row.address);
+
+    // 返回地址列表给客户端
+    return res.status(200).send({ addresses: addresses });
   });
 });
 
-// 用户登录路由，生成令牌
-router.post('/login', passport.authenticate('local', { session: false }), (req, res) => {
-  // 身份验证成功，生成 JWT 令牌
-  const token = sign({ userId: req.user.id, username: req.user.username }, { expiresIn: '1h' });
+// 添加钱包地址
+router.post('/add-wallet', passport.authenticate('jwt', { session: false }), (req, res) => {
+  const userId = req.user.id;
+  const { address } = req.body;
 
-  // 返回令牌给客户端
-  res.status(200).send({ token: token });
+  if(!verify_address(address)) return res.status(400).send({ msg: 'Invalid address' });
+
+  // 检查地址是否已存在
+  db.get('SELECT id FROM wallet WHERE userId = ? AND address = ?', [userId, address], (err, row) => {
+    if (err) {
+      return res.status(500).send({ msg: 'Internal Server Error' });
+    }
+
+    if (row) {
+      // 地址已存在
+      return res.status(400).send({ msg: 'Address already exists' });
+    }
+
+    // 插入新的钱包地址
+    db.run('INSERT INTO wallet (userId, address) VALUES (?, ?)', [userId, address], (err) => {
+      if (err) {
+        return res.status(500).send({ msg: 'Internal Server Error' });
+      }
+
+      return res.status(200).send({ msg: 'Address added successfully' });
+    });
+  });
 });
 
-const info_router = require("./info.js");
 
-router.use("/info", info_router);
+// 删除钱包地址
+router.delete('/delete-wallet', passport.authenticate('jwt', { session: false }), (req, res) => {
+  const userId = req.user.id;
+  const { address } = req.body;
+
+  // 删除数据库中的钱包地址
+  db.run('DELETE FROM wallet WHERE userId = ? AND address = ?', [userId, address], (err) => {
+    if (err) {
+      return res.status(500).send({ msg: 'Internal Server Error' });
+    }
+
+    return res.status(200).send({ msg: 'Address deleted successfully' });
+  });
+});
 
 module.exports = router;
 
