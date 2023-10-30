@@ -2,7 +2,7 @@ const { func_deploy, func_deploy_fromfile } = require('./deploy.js');
 const rchainToolkit = require('@fabcotech/rchain-toolkit');
 const { verifyRevAddr } = require('@tgrospic/rnode-grpc-js')
 
-// EasyToken 的地址
+// 将 contract id 粘贴到这里
 const contract_id = "rho:id:on34ejhd6jijn5wu9ozojmtect6trh8bouwdkbtyo6sgnmzsc1urbm";
 
 const create_wallet = async(pk) => {
