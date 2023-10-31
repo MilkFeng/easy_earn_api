@@ -55,6 +55,15 @@ npm run deploy
 
 部署完后会返回一个 `contract_id`，将它粘贴到 `src/common/rhoopt.js` 中。
 
+部署合约时，会向部署者的钱包初始化一定数量的代币。
+
+如果没有更改配置的话，现在部署者的私钥、公钥、钱包地址分别为：
+```
+private key: 6b2c9887ce24094087896a0fa3c64e3faec8ad06f16fbe72da3a44463aeca8a9
+public key: 045fe473dfecbf8f2c9043ce85380423f860e551c701078879f76b0ab5519074e5f1eac8ea7ebf4d503b36733e388a1774b01b3a8f93d2010a9b66202b97c45ed7
+address: 11112gNSU4Ytt3b2TpAQnggARSidPpNxrNkWqFFg52aNe5t6sjCy2c
+```
+
 ### 启动服务器
 
 ```
