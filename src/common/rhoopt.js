@@ -2,7 +2,7 @@ const { func_deploy, func_deploy_fromfile } = require('./deploy.js');
 const { verifyRevAddr } = require('@tgrospic/rnode-grpc-js')
 
 // 将 contract id 粘贴到这里
-const contract_id = "rho:id:xcuhndaddg4419keu3x9imtori5o8qy76rj5ya6s5i69c4kpqzk5jp";
+const contract_id = "rho:id:3w8zg13xnsbgbyx6cgfhyrw4nsriwyjycbiwo38xercxzfoesaop33";
 
 const run_with_full_code = async (code) => await func_deploy(code, 0);
 

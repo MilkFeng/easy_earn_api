@@ -4,6 +4,17 @@ const winston = require('winston');
 
 const app = express();
 
+// 如果没有src/database文件夹，那么创建一个
+
+const fs = require('fs');
+const path = require('path');
+const db_path = path.join(__dirname, 'src/database');
+if(!fs.existsSync(db_path)) {
+    fs.mkdirSync(db_path);
+}
+
+console.log(db_path);
+
 // 配置Express中间件
 app.use(express.json());
 
