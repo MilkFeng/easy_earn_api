@@ -2,7 +2,8 @@ const express = require('express');
 const { passport, db } = require('./passport.js');
 const sqlite3 = require('sqlite3').verbose();
 
-const { verify_address } = require('../common/rhoopt.js')
+const { verify_address } = require('../common/rhoopt.js');
+const { verify_body } = require('../common/utils.js');
 
 const router = express.Router();
 
@@ -32,7 +33,9 @@ router.get('/get-wallets', passport.authenticate('jwt', { session: false }), (re
 // 添加钱包地址
 router.post('/add-wallet', passport.authenticate('jwt', { session: false }), (req, res) => {
   const userId = req.user.id;
-  const { address } = req.body;
+  const mp = verify_body(req.body, ["address"], res);
+  if(mp === null) return ;
+  const { address } = mp;
 
   if(!verify_address(address)) return res.status(400).send({ msg: 'Invalid address' });
 
@@ -62,7 +65,9 @@ router.post('/add-wallet', passport.authenticate('jwt', { session: false }), (re
 // 删除钱包地址
 router.delete('/delete-wallet', passport.authenticate('jwt', { session: false }), (req, res) => {
   const userId = req.user.id;
-  const { address } = req.body;
+  const mp = verify_body(req.body, ["address"], res);
+  if(mp === null) return ;
+  const { address } = mp;
 
   // 删除数据库中的钱包地址
   db.run('DELETE FROM wallet WHERE userId = ? AND address = ?', [userId, address], (err) => {
