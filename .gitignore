@@ -1,5 +1,6 @@
 # node.js 生成的文件
 node_modules/
+package-lock.json
 
 # 日志文件
 logs/
