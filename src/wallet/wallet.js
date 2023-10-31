@@ -59,7 +59,7 @@ router.post('/balance', async (req, res) => {
 });
 
 // 获取钱包的交易序号
-router.get('/nonce', async (req, res) => {
+router.post('/nonce', async (req, res) => {
     const mp = verify_body(req.body, ["address"], res);
     if(mp == null) return ;
     const { address } = mp;

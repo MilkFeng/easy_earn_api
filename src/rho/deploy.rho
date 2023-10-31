@@ -152,7 +152,7 @@ in {
       if(amount <= 0) { ack!((false, "amount must be positive")) }
       else {
         if(from == to) { ack!((false, "cannot transfer between two same address")) }
-        else { verify!(from, nonce, [nonce, amount, to].toByteArray(), pk, sig, *transferNonceMapCh, *ack) }
+        else { verify!(from, nonce, [from, to, nonce, amount].toByteArray(), pk, sig, *transferNonceMapCh, *ack) }
       }
     } |
     /**

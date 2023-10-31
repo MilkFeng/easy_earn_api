@@ -54,7 +54,7 @@ const verify_body = (body, keys, res) => {
                 break;
         };
         if(!validate(body[key])) {
-            res.status(400).send({ msg: "invalid " + key });
+            res.status(400).send({ msg: "invalid " + key + ": " + body[key] });
             return null;
         }
         map[key] = body[key];
