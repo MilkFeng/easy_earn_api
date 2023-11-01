@@ -1,6 +1,7 @@
 new 
-  result, EasyEarnContract, verify,
-  transferNonceMapCh, taskNonceMapCh, recordNonceMapCh,
+  result, EasyEarnContract, verify, nonceOf,
+  initNonce,
+  transferNonceMapCh, taskNonceMapCh, recordNonceMapCh, updateNonceMapCh,
   revAddressOps(`rho:rev:address`),
   blake2b256HashOps(`rho:crypto:blake2b256Hash`),
   secp256k1VerifyOps(`rho:crypto:secp256k1Verify`)
@@ -53,9 +54,46 @@ in {
           nonceMapCh!(nonceMap) | ack!((false, "nonce not match"))
         }
       }
-      
     }
   } |
+
+  /**
+  * 从指定信道中获取指定钱包地址的序号
+  *
+  * @param address: String, 钱包地址
+  * @param nonceMapCh: Name, 保存钱包序号 Map 的信道
+  */
+  contract nonceOf(@address, nonceMapCh, ack) = {
+    for(@nonceMap <- nonceMapCh) {
+      if(nonceMap.contains(address)) { ack!((true, nonceMap.get(address))) }
+      else { ack!((false, "wallet not found")) }
+    }
+  } |
+
+  /**
+   * 初始化钱包的一些序号
+   */
+  contract initNonce(@address, @first) = {
+    if(first) {
+      transferNonceMapCh!({ address: -1 }) |
+      taskNonceMapCh!({ address: -1 }) |
+      recordNonceMapCh!({ address: -1 }) |
+      updateNonceMapCh!({ address: -1 })
+    } else {
+      for(
+        @transferNonceMap <- transferNonceMapCh;
+        @taskNonceMap <- taskNonceMapCh;
+        @recordNonceMap <- recordNonceMapCh;
+        @updateNonceMap <- updateNonceMapCh
+      ) {
+        transferNonceMapCh!(transferNonceMap.union({ address: -1 })) |
+        taskNonceMapCh!(taskNonceMap.union({ address: -1 })) |
+        recordNonceMapCh!(recordNonceMap.union({ address: -1 })) |
+        updateNonceMapCh!(updateNonceMap.union({ address: -1 }))
+      }
+    }
+  } |
+
   /**
    * 钱包相关的智能合约
    */
@@ -96,9 +134,7 @@ in {
                   ack!((false, "wallet already exists"))
                 } else {
                   balanceMapCh!(balanceMap.union({ address: 0 })) |
-                  transferNonceMapCh!(transferNonceMap.union({ address: -1 })) |
-                  taskNonceMapCh!(taskNonceMap.union({ address: -1 })) |
-                  recordNonceMapCh!(recordNonceMap.union({ address: -1 })) |
+                  initNonce!(address, false) |
                   ack!((true, address))
                 }
               }
@@ -116,10 +152,7 @@ in {
      * @return (Boolean, String), 查找结果和信息
      */
     contract EasyEarnContract(@"nonceOf", @address, ack) = {
-      for(@transferNonceMap <<- transferNonceMapCh) {
-        if(transferNonceMap.contains(address)) { ack!((true, transferNonceMap.get(address))) }
-        else { ack!((false, "wallet not found")) }
-      }
+      nonceOf!(address, *transferNonceMapCh, *ack)
     } |
     /**
      * 用来查找钱包的余额
@@ -204,9 +237,7 @@ in {
       revAddressOps!("fromDeployerId", *deployerId, *revAddressCh) |
       for(@address <- revAddressCh) {
         balanceMapCh!({ address: 10000000000 }) |
-        transferNonceMapCh!({ address: -1 }) |
-        taskNonceMapCh!({ address: -1 }) |
-        recordNonceMapCh!({ address: -1 })
+        initNonce!(address, true)
       }
     }
   } |
@@ -214,18 +245,91 @@ in {
    * 哈希值上传与验证的智能合约
    */
   new
-    upload, taskMapCh,
-    recordHashMapCh, submitNonceCh, recordHashMapCh, submitMapCh, recordMapCh, taskRecordListMapCh
+    upload, update, getContent,
+    taskMapCh, recordMapCh, taskRecordListMapCh
   in {
+    /**
+    * 获取指定钱包地址的任务序号
+    *
+    * @param address: String, 钱包地址
+    */
+    contract EasyEarnContract(@"taskNonceOf", @address, ack) = {
+      nonceOf!(address, *taskNonceMapCh, *ack)
+    } |
+
+    /**
+    * 获取指定钱包地址的提交记录序号, 即读取 recordNonceMap 并查找 address 对应的序号
+    *
+    * @param address: String, 钱包地址
+    */
+    contract EasyEarnContract(@"recordNonceOf", @address, ack) = {
+      nonceOf!(address, *recordNonceMapCh, *ack)
+    } |
+
+    /**
+     * 获取指定钱包地址的更新序号
+     *
+     * @param address: String, 钱包地址
+     */
+    contract EasyEarnContract(@"updateNonceOf", @address, ack) = {
+      nonceOf!(address, *updateNonceMapCh, *ack)
+    } |
+
+    /**
+    * 从指定信道中获取(address, nonce)对应的版本和哈希值
+    *
+    * @param address: String, 钱包地址
+    * @param nonce: Int, 任务的序号
+    * @param mapCh: Name, 保存任务哈希值 Map 的信道
+    * @param ack: Name, 返回结果的信道
+    *
+    * @return (Boolean, String), 查找结果和信息
+    */
+    contract getContent(@address, @nonce, mapCh, ack) = {
+      for(@map <<- mapCh){
+        if(map.contains((address, nonce))) { ack!((true, map.get((address, nonce)))) }
+        else { ack!((false, "not found"))}
+      }
+    } |
+
+    /**
+    * 获取(address, nonce)对应的任务哈希值和状态
+    *
+    * @param address: String, 钱包地址
+    * @param nonce: Int, 任务的序号
+    *
+    * @return (Boolean, String), 查找结果和信息
+    */
+    contract EasyEarnContract(@"taskOf", @address, @nonce, ack) = {
+      getContent!(address, nonce, *taskMapCh, *ack)
+    } |
+
+    /**
+    * 获取(address, nonce)对应的提交记录哈希值
+    *
+    * @param address: String, 钱包地址
+    * @param nonce: Int, 任务的序号
+    *
+    * @return (Boolean, String), 查找结果和信息
+    */
+    contract EasyEarnContract(@"recordOf", @address, @nonce, ack) = {
+      getContent!(address, nonce, *recordMapCh, *ack)
+    } |
+
     /**
      * 用来上传哈希值
      *
      * @param address: String, 钱包地址
      * @param nonce: Int, 上传信息的信息序号
+     * @param version: Number, 上传的版本号
      * @param hash: String, 上传的哈希值
+     * @param bytes: ByteArray, 上传的字节数组
      * @param pk: String, 钱包的公钥
      * @param sig: String, 钱包的签名
+     * @param nonceMapCh: Name, 保存钱包序号 Map 的信道
      * @param hashMapCh: Name, 哈希Map信道
+     * @param ack: Name, 返回结果的信道
+     *
      * @return (Boolean, String), 上传结果和信息
      */
     
@@ -235,23 +339,81 @@ in {
     // 智能合约验证 nonce 是否是钱包的已完成的交易序号加一
     // 智能合约验证 address, nonce, hash, pk, sig 的签名是否正确
     // 如果验证通过，将 hash 保存到 hashMap 中
-    contract upload(@address, @nonce, @hash, @pk, @sig, hashMapCh, ack) = {
-      new ret, verifyCh in {
-        // 查找钱包
-        EasyEarnContract!("find", address, *ret) |
-        for(@(suc, _) <- ret) {
-          if(not suc) { ack!((false, "wallet not found")) }
+    contract upload(@address, @nonce, @version, @hash, @bytes, @pk, @sig, nonceMapCh, hashMapCh, ack) = {
+      new verifyCh in {
+        verify!(address, nonce, bytes, pk, sig, *nonceMapCh, *verifyCh) |
+        for(@(suc, ret) <- verifyCh) {
+          if(not suc) { ack!((false, ret)) }
           else {
-            // 验证签名
-            verify!(address, nonce, hash, pk, sig, *verifyCh) |
-            for(@(suc, ret) <- verifyCh) {
+            // 保存哈希值
+            for(@hashMap <- hashMapCh) {
+              hashMapCh!(hashMap.union({ (address, nonce): (version, hash) }))
+            } |
+            ack!((true, "upload success"))
+          }
+        }
+      }
+    } |
+
+    /**
+     * 用来上传任务哈希值
+     *
+     * @param address: String, 钱包地址
+     * @param nonce: Int, 上传信息的信息序号
+     * @param hash: String, 上传的哈希值
+     * @param version: Number, 上传的版本号
+     * @param pk: String, 钱包的公钥
+     * @param sig: String, 钱包的签名
+     * @param ack: Name, 返回结果的信道
+     *
+     * @return (Boolean, String), 上传结果和信息
+     */
+    contract EasyEarnContract(@"uploadTask", @address, @nonce, @version, @hash, @pk, @sig, ack) = {
+      upload!(address, nonce, version, hash, [address, nonce, version, hash].toByteArray(), pk, sig, *taskNonceMapCh, *taskMapCh, *ack)
+    } |
+
+    /**
+    * 提交任务提交记录
+    *
+    * @param submitter: String, 提交者钱包地址
+    * @param submitNonce: Int, 提交记录的序号
+    * @param pulisher: String, 任务发布者钱包地址
+    * @param publishNonce: Int, 此任务在任务发布者所有任务中的序号
+    * @param version: Number, 提交记录的版本号
+    * @param hash: String, 提交内容哈希
+    * @param pk: String, 公钥
+    * @param sig: String, 签名
+    */
+    contract EasyEarnContract(@"uploadRecord", @submitter, @submitNonce, @publisher, @publishNonce, @version, @hash, @pk, @sig, ack) = {
+      new uploadRetCh, findRetCh in {
+        // 先检查 (publisher, publichNonce) 这个任务是否存在
+        EasyEarnContract!("taskOf", publisher, publishNonce, *findRetCh) |
+        for(@(suc, _) <- findRetCh) {
+          // 不存在时，返回错误信息
+          if(not suc) { ack!((false, "task not found")) }
+          else {
+            // 存在时，先将提交记录保存到 recordMap 中，再将提交记录的序号保存到 taskRecordListMap 中
+            // upload 将提交记录保存到 recordMap 中，同时验证了提交记录的正确性
+            upload!(submitter, submitNonce, version, hash, [submitter, submitNonce, publisher, publishNonce, version, hash].toByteArray(), pk, sig, *recordNonceMapCh, *recordMapCh, *uploadRetCh) |
+            for(@(suc, ret) <- uploadRetCh) {
+              // 保存失败时，返回错误信息
               if(not suc) { ack!((false, ret)) }
+              // 保存成功时，将提交记录的序号保存到 taskRecordListMap 中
               else {
-                // 保存哈希值
-                for(@hashMap <- hashMapCh) {
-                  hashMapCh!(hashMap.union({ (address, nonce): hash }))
-                } |
-                ack!((true, "upload success"))
+                for(@taskRecordListMap <- taskRecordListMapCh) {
+                  // 判断 taskRecordListMap 中是否存在 (publisher, publishNonce) 这个任务
+                  if(taskRecordListMap.contains((publisher, publishNonce))) {
+                    // 存在时，将提交记录的序号保存到对应的列表中
+                    taskRecordListMapCh!(taskRecordListMap.set(
+                      (publisher, publishNonce),
+                      taskRecordListMap.get((publisher, publishNonce)) ++ (submitter, submitNonce)
+                    ))
+                  } else {
+                    // 不存在时，创建一个空的提交记录列表
+                    taskRecordListMapCh!(taskRecordListMap.union({ (publisher, publishNonce): [(submitter, submitNonce)] }))
+                  } |
+                  ack!((true, "upload success"))
+                }
               }
             }
           }
@@ -260,188 +422,38 @@ in {
     } |
 
     /**
-    *获取指定钱包地址的任务序号
-    *
-    * @param address: String, 钱包地址
-    */
-    contract EasyEarnContract(@"taskNonceOf", @address, ack) = {
-      new pubRet in {
-        //验证签名
-        EasyEarnContract!("find", address, *pubRet) |
-        for(@(successPub, _) <- pubRet){
-          if(not successPub){
-            ack!((false, "wallet not found"))
-          }else{
-            // 读取任务序号
-            for(@taskNonceMap <<- taskNonceMapCh){
-              if(taskNonceMap.contains(address)) { ack!((true, taskNonceMap.get(address))) }
-              else { ack!((false, "nonce not found")) }
+     * 用来更新哈希值
+     *
+     * @param address: String, 钱包地址
+     * @param taskNonce: Int, 任务的序号
+     * @param updateNonce: Int, 更新信息的信息序号
+     * @param version: Number, 更新的版本号
+     * @param hash: String, 更新的哈希值
+     * @param pk: String, 钱包的公钥
+     * @param sig: String, 钱包的签名
+     * @param ack: Name, 返回结果的信道
+     *
+     * @return (Boolean, String), 更新结果和信息
+     */
+    contract EasyEarnContract(@"updateTask", @address, @taskNonce, @updateNonce, @version, @hash, @pk, @sig, ack) = {
+      new verifyCh in {
+        verify!(address, updateNonce, [address, taskNonce, updateNonce, version, hash].toByteArray(), pk, sig, *updateNonceMapCh, *verifyCh) |
+        for(@(suc, ret) <- verifyCh) {
+          if(not suc) { ack!((false, ret)) }
+          else {
+            for(@taskMap <- taskMapCh) {
+              if(taskMap.contains((address, taskNonce))) {
+                taskMapCh!(taskMap.union({ (address, taskNonce): (version, hash) })) |
+                ack!((true, "update success"))
+              } else {
+                ack!((false, "task not found"))
+              }
             }
           }
         }
       }
-    } |
-    /**
-    *获取指定钱包地址的提交记录序号, 即读取 recordNonceMap 并查找 address 对应的序号
-    *
-    * @param address: String, 钱包地址
-    */
-    contract EasyEarnContract(@"recordNonceOf", @address, ack) = {
-      new pubRet in {
-        //验证签名
-        EasyEarnContract!("find", address, *pubRet) |
-        for(@(successPub, _) <- pubRet){
-          if(not successPub){
-            ack!((false, "wallet not found"))
-          }else{
-            for(@recordNonceMap <<- recordNonceMapCh){
-              if(recordNonceMap.contains(address)) { ack!((true, recordNonceMap.get(address))) }
-              else { ack!((false, "record nonce not found")) }
-            }
-          }
-        }
-      }
-    } |
-    /**
-    *获取(address, nonce)对应的任务哈希值和状态
-    *
-    * @param address: String, 钱包地址
-    * @param nonce: Int, 任务的序号
-    */
-    contract EasyEarnContract(@"taskOf", @address, @nonce, ack) = {
-      new pubRet in {
-        //验证签名
-        EasyEarnContract!("find", address, *pubRet) |
-        for(@(successPub, _) <- pubRet){
-          if(not successPub){
-            ack!((false, "wallet not found"))
-          }else{
-            //查询任务信息
-            for(@taskMap <<- taskMapCh){
-              if(taskMap.contains((address,nonce))) { ack!((true, taskMap.get((address, nonce)))) }
-              else { ack!((false, "task not found"))}
-            }
-          }
-        }
-      }
-    } |
-    /**
-    *获取(address, nonce)对应的提交记录哈希值
-    *
-    * @param address: String, 钱包地址
-    * @param nonce: Int, 任务的序号
-    */
-    contract EasyEarnContract(@"recordOf", @address, @nonce, ack) = {
-      new verifyCh, pubRet in {
-        // 验证签名
-        EasyEarnContract!("find", address, *pubRet) |
-        for (@(successPub, _) <- pubRet) {
-          if (not successPub) {
-            ack!((false, "wallet not found"))
-          } else {
-            // 查询提交记录哈希值
-            for (@recordMap <<- recordMapCh) {
-              if(recordMap.contains((address,nonce))) { ack!((true, recordMap.get((address, nonce)))) }
-              else { ack!((false, "record not found"))}
-            }
-          }
-        }
-      }
-    } |
-    /**
-    *上传任务
-    *
-    * @param address: String, 任务发布者钱包地址
-    * @param nonce: Int, 发布任务的序号
-    * @param hash: String, 提交内容哈希
-    * @param amount: float, 酬金
-    * @param pk: String, 公钥
-    * @param sig: String, 签名
-    */
-    contract EasyEarnContract(@"uploadTask", @address, @nonce, @hash, @amount, @pk, @sig, ack) = {
-      new verifyCh, pubRet in {
-        //验证签名
-        EasyEarnContract!("find", address, *pubRet) |
-        for(@(successPub, _) <- pubRet){
-          if(not successPub){
-            ack!((false, "wallet not found"))
-          }else{
-            verify!(address, nonce, [address, nonce].toByteArray(), pk, sig, *submitNonceCh, *verifyCh) |
-            for(@(success, ret) <- verifyCh) {
-              if(success) {
-                upload!(address, nonce, hash, pk, sig, *submitMapCh, *ack) |
-                for(@taskNonceMap <- taskNonceMapCh; @taskMap <- taskMapCh){
-                  taskNonceMapCh!(taskNonceMap.set(address, nonce)) |
-                  taskMapCh!(taskMap.set((address, nonce),((hash, 0, amount))))
-                } 
-              } else { ack!((false, ret)) }
-            }
-          }
-        }
-      }
-    } |
-    /**
-    *提交任务提交记录
-    *
-    * @param submitter: String, 提交者钱包地址
-    * @param submitNonce: Int, 提交记录的序号
-    * @param pulisher: String, 任务发布者钱包地址
-    * @param publishNonce: Int, 此任务在任务发布者所有任务中的序号
-    * @param hash: String, 提交内容哈希
-    * @param pk: String, 公钥
-    * @param sig: String, 签名
-    */
-    contract EasyEarnContract(@"uploadRecord", @submitter, @submitNonce, @publisher, @publishNonce, @hash, @pk, @sig, ack) = {
-      new verifyCh, subRet, pubRet, uploadRet in {
-        //验证签名
-        EasyEarnContract!("find", submitter, *subRet) |
-        EasyEarnContract!("find", publisher, *pubRet) |
-        for(@(successSub, _) <- subRet; @(successPub, _) <- pubRet){
-          if((not successSub) or (not successPub)){
-            ack!((false, "wallet not found"))
-          }else{
-            verify!(submitter, submitNonce, [submitter, submitNonce].toByteArray(), pk, sig, *submitNonceCh, *verifyCh) |
-            for(@(success, ret) <- verifyCh) {
-              if(success) {
-                upload!(submitter, submitNonce, hash, pk, sig, *submitMapCh, *ack) |
-                for(@recordNonceMap <- recordNonceMapCh; @recordMap <- recordMapCh; @taskRecordListMap <- taskRecordListMapCh){
-                  recordNonceMapCh!(recordNonceMap.set(submitter, submitNonce)) |
-                  recordMapCh!(recordMap.set((submitter, submitNonce), hash)) |
-                  taskRecordListMapCh!(taskRecordListMap.get((publisher, publishNonce)) ++ (submitter, submitNonce))
-                }
-              } else { ack!((false, ret)) }
-            }
-          }
-        }
-      }  
-    } |
-
-
-
-    contract EasyEarnContract(@"checkRecord", @address, @nonce, @submitter, @submitNonce, @pk, @sig, ack) = {
-      new verifyCh, subRet, pubRet, uploadRet in {
-        //验证签名
-        EasyEarnContract!("find", submitter, *subRet) |
-        for(@(successSub, _) <- subRet; @(successPub, _) <- pubRet){
-          if((not successSub) or (not successPub)){
-            ack!((false, "wallet not found"))
-          }else{
-            verify!(submitter, submitNonce, [submitter, submitNonce].toByteArray(), pk, sig, *submitNonceCh, *verifyCh) |
-            for(@(success, ret) <- verifyCh) {
-              if(success) {
-                //upload!(submitter, submitNonce, hash, pk, sig, *submitMapCh, *ack) |
-                //EasyEarnContract!("transfer", address, submitter, nonce, @amount, pk, sig, ack) |
-                //修改状态 |
-              } else { ack!((false, ret)) }
-            }
-          }
-        }
-      }  
     }
-
-
   } |
-  
 
   /**
    * 将部署的智能合约注册到 rchain 中
