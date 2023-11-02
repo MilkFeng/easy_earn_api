@@ -14,5 +14,8 @@ rnode.data.dir_IS_UNDEFINED/
 # 数据库文件
 src/database/
 
+# 配置文件
+config.json
+
 # .gitingore 必须要有
 !.gitingore
