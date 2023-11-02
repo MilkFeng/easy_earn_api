@@ -67,16 +67,13 @@ app.use((err, req, res, next) => {
 const wallet_router = require('./src/wallet/wallet.js');
 const auth_router = require('./src/user/auth.js');
 const user_router = require("./src/user/user.js");
-const task_router = require("./src/mission/task/task.js");
-const record_router = require("./src/mission/record/record.js");
+const task_router = require("./src/task/task.js");
 
 // 使用路由
 app.use('/wallet', wallet_router);
 app.use('/auth', auth_router);
 app.use("/user", user_router);
 app.use("/task", task_router);
-app.use("/record", record_router);
-
 
 // 检测服务器连接状况
 app.get('/', (req, res) => {

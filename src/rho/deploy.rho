@@ -321,7 +321,6 @@ in {
      *
      * @param address: String, 钱包地址
      * @param nonce: Int, 上传信息的信息序号
-     * @param version: Number, 上传的版本号
      * @param hash: String, 上传的哈希值
      * @param bytes: ByteArray, 上传的字节数组
      * @param pk: String, 钱包的公钥
@@ -339,7 +338,7 @@ in {
     // 智能合约验证 nonce 是否是钱包的已完成的交易序号加一
     // 智能合约验证 address, nonce, hash, pk, sig 的签名是否正确
     // 如果验证通过，将 hash 保存到 hashMap 中
-    contract upload(@address, @nonce, @version, @hash, @bytes, @pk, @sig, nonceMapCh, hashMapCh, ack) = {
+    contract upload(@address, @nonce, @hash, @bytes, @pk, @sig, nonceMapCh, hashMapCh, ack) = {
       new verifyCh in {
         verify!(address, nonce, bytes, pk, sig, *nonceMapCh, *verifyCh) |
         for(@(suc, ret) <- verifyCh) {
@@ -347,7 +346,7 @@ in {
           else {
             // 保存哈希值
             for(@hashMap <- hashMapCh) {
-              hashMapCh!(hashMap.union({ (address, nonce): (version, hash) }))
+              hashMapCh!(hashMap.union({ (address, nonce): hash }))
             } |
             ack!((true, "upload success"))
           }
@@ -361,15 +360,14 @@ in {
      * @param address: String, 钱包地址
      * @param nonce: Int, 上传信息的信息序号
      * @param hash: String, 上传的哈希值
-     * @param version: Number, 上传的版本号
      * @param pk: String, 钱包的公钥
      * @param sig: String, 钱包的签名
      * @param ack: Name, 返回结果的信道
      *
      * @return (Boolean, String), 上传结果和信息
      */
-    contract EasyEarnContract(@"uploadTask", @address, @nonce, @version, @hash, @pk, @sig, ack) = {
-      upload!(address, nonce, version, hash, [address, nonce, version, hash].toByteArray(), pk, sig, *taskNonceMapCh, *taskMapCh, *ack)
+    contract EasyEarnContract(@"uploadTask", @address, @nonce, @hash, @pk, @sig, ack) = {
+      upload!(address, nonce, hash, [address, nonce, hash].toByteArray(), pk, sig, *taskNonceMapCh, *taskMapCh, *ack)
     } |
 
     /**
@@ -379,12 +377,11 @@ in {
     * @param submitNonce: Int, 提交记录的序号
     * @param pulisher: String, 任务发布者钱包地址
     * @param publishNonce: Int, 此任务在任务发布者所有任务中的序号
-    * @param version: Number, 提交记录的版本号
     * @param hash: String, 提交内容哈希
     * @param pk: String, 公钥
     * @param sig: String, 签名
     */
-    contract EasyEarnContract(@"uploadRecord", @submitter, @submitNonce, @publisher, @publishNonce, @version, @hash, @pk, @sig, ack) = {
+    contract EasyEarnContract(@"uploadRecord", @submitter, @submitNonce, @publisher, @publishNonce, @hash, @pk, @sig, ack) = {
       new uploadRetCh, findRetCh in {
         // 先检查 (publisher, publichNonce) 这个任务是否存在
         EasyEarnContract!("taskOf", publisher, publishNonce, *findRetCh) |
@@ -394,7 +391,7 @@ in {
           else {
             // 存在时，先将提交记录保存到 recordMap 中，再将提交记录的序号保存到 taskRecordListMap 中
             // upload 将提交记录保存到 recordMap 中，同时验证了提交记录的正确性
-            upload!(submitter, submitNonce, version, hash, [submitter, submitNonce, publisher, publishNonce, version, hash].toByteArray(), pk, sig, *recordNonceMapCh, *recordMapCh, *uploadRetCh) |
+            upload!(submitter, submitNonce, hash, [submitter, submitNonce, publisher, publishNonce, hash].toByteArray(), pk, sig, *recordNonceMapCh, *recordMapCh, *uploadRetCh) |
             for(@(suc, ret) <- uploadRetCh) {
               // 保存失败时，返回错误信息
               if(not suc) { ack!((false, ret)) }
@@ -427,7 +424,6 @@ in {
      * @param address: String, 钱包地址
      * @param taskNonce: Int, 任务的序号
      * @param updateNonce: Int, 更新信息的信息序号
-     * @param version: Number, 更新的版本号
      * @param hash: String, 更新的哈希值
      * @param pk: String, 钱包的公钥
      * @param sig: String, 钱包的签名
@@ -435,15 +431,15 @@ in {
      *
      * @return (Boolean, String), 更新结果和信息
      */
-    contract EasyEarnContract(@"updateTask", @address, @taskNonce, @updateNonce, @version, @hash, @pk, @sig, ack) = {
+    contract EasyEarnContract(@"updateTask", @address, @taskNonce, @updateNonce, @hash, @pk, @sig, ack) = {
       new verifyCh in {
-        verify!(address, updateNonce, [address, taskNonce, updateNonce, version, hash].toByteArray(), pk, sig, *updateNonceMapCh, *verifyCh) |
+        verify!(address, updateNonce, [address, taskNonce, updateNonce, hash].toByteArray(), pk, sig, *updateNonceMapCh, *verifyCh) |
         for(@(suc, ret) <- verifyCh) {
           if(not suc) { ack!((false, ret)) }
           else {
             for(@taskMap <- taskMapCh) {
               if(taskMap.contains((address, taskNonce))) {
-                taskMapCh!(taskMap.union({ (address, taskNonce): (version, hash) })) |
+                taskMapCh!(taskMap.union({ (address, taskNonce): hash })) |
                 ack!((true, "update success"))
               } else {
                 ack!((false, "task not found"))
