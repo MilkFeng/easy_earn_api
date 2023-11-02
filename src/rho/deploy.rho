@@ -64,7 +64,7 @@ in {
   * @param nonceMapCh: Name, 保存钱包序号 Map 的信道
   */
   contract nonceOf(@address, nonceMapCh, ack) = {
-    for(@nonceMap <- nonceMapCh) {
+    for(@nonceMap <<- nonceMapCh) {
       if(nonceMap.contains(address)) { ack!((true, nonceMap.get(address))) }
       else { ack!((false, "wallet not found")) }
     }
@@ -128,10 +128,11 @@ in {
           match address {
             Nil => ack!((false, "invalid public key"))
             String => {
-              for(@balanceMap <- balanceMapCh; @transferNonceMap <- transferNonceMapCh; @taskNonceMap <- taskNonceMapCh; @recordNonceMap <- recordNonceMapCh) {
+              for(@balanceMap <- balanceMapCh) {
                 // 钱包地址和交易序号都不存在时，创建钱包，否则返回错误信息
-                if(balanceMap.contains(address) and transferNonceMap.contains(address)) {
-                  ack!((false, "wallet already exists"))
+                if(balanceMap.contains(address)) {
+                  ack!((false, "wallet already exists")) |
+                  balanceMapCh!(balanceMap)
                 } else {
                   balanceMapCh!(balanceMap.union({ address: 0 })) |
                   initNonce!(address, false) |
