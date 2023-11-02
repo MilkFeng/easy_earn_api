@@ -1,8 +1,8 @@
 const { func_deploy, func_deploy_fromfile } = require('./deploy.js');
-const { verifyRevAddr } = require('@tgrospic/rnode-grpc-js')
+const { config } = require('./config.js');
 
 // 将 contract id 粘贴到这里
-const contract_id = "rho:id:3w8zg13xnsbgbyx6cgfhyrw4nsriwyjycbiwo38xercxzfoesaop33";
+const contract_id = config.contract_id;
 
 const run_with_full_code = async (code) => await func_deploy(code, 0);
 
@@ -58,10 +58,6 @@ const get_nonce = async (address) => await run_with_name_and_args("nonceOf", `"$
 // 交易
 const transfer = async (from, to, nonce, amount, pk, sig) => await run_with_name_and_args("transfer", `"${from}", "${to}", ${nonce}, ${amount}, "${pk}", "${sig}"`);
 
-// 验证钱包地址的合法性
-const verify_address = verifyRevAddr;
-
-
 // 获取任务序号
 const get_task_nonce = async (address) => await run_with_name_and_args("taskNonceOf", `"${address}"`);
 
@@ -92,7 +88,6 @@ module.exports = {
     get_balance,
     get_nonce,
     transfer,
-    verify_address,
 
     get_task_nonce,
     get_record_nonce,

@@ -1,11 +1,10 @@
 const express = require('express');
-const { verify_body } = require('../common/utils')
+const { requestChecker, sendRhoResult } = require('../common/utils')
 
 const {
     create_wallet,
     find_wallet,
     get_balance,
-    verify_address,
     get_nonce,
     transfer,
 } = require('./../common/rhoopt.js');
@@ -14,76 +13,41 @@ const {
 const router = express.Router();
 
 // 创建钱包
-router.post('/create', async (req, res) => {
+router.post('/create', requestChecker('body', ["pk"], async (req, res) => {
     // 创建一个新的钱包，这里需要客户端发送钱包地址
-    const mp = verify_body(req.body, ["pk"], res);
-    if(mp == null) return ;
-    const { pk } = mp;
-
+    const { pk } = req.body;
     const ret = await create_wallet(pk);
-
-    if(ret) {
-        if(ret[0]) res.status(200).send({ msg: "wallet create successfully", address: ret[1] });
-        else res.status(409).send({ msg: ret[1] });
-    } else return res.status(409).send({ msg: "unable to communicate with rnode" });
-});
+    sendRhoResult(ret, "address", res);
+}));
 
 // 查找钱包
-router.post('/find', async (req, res) => {
+router.post('/find', requestChecker('body', ["address"], async (req, res) => {
     // 查找钱包，这里需要客户端发送钱包地址
-    const mp = verify_body(req.body, ["address"], res);
-    if(mp == null) return ;
-    const { address } = mp;
-
+    const { address } = req.body;
     const ret = await find_wallet(address);
-
-    if(ret) {
-        if(ret[0]) res.status(200).send({ msg: "wallet is found", address: ret[1] });
-        else res.status(409).send({ msg: ret[1] });
-    } else return res.status(409).send({ msg: "unable to communicate with rnode" });
-});
+    sendRhoResult(ret, "address", res);
+}));
 
 // 检测钱包中的代币余额
-router.post('/balance', async (req, res) => {
-    const mp = verify_body(req.body, ["addresses"], res);
-    if(mp == null) return ;
-    const { addresses } = mp;
-
+router.post('/balance', requestChecker('body', ["addresses"], async (req, res) => {
+    const { addresses } = req.body;
     const ret = await get_balance(addresses);
-
-    if(ret) {
-        if(ret[0]) res.status(200).send({ msg: "get balance successfully", balance: ret[1] });
-        else res.status(409).send({ msg: ret[1] });
-    } else res.status(409).send({ msg: "unable to communicate with rnode" });
-});
+    sendRhoResult(ret, "balance", res);
+}));
 
 // 获取钱包的交易序号
-router.post('/nonce', async (req, res) => {
-    const mp = verify_body(req.body, ["address"], res);
-    if(mp == null) return ;
-    const { address } = mp;
-
+router.post('/nonce', requestChecker('body', ["address"], async (req, res) => {
+    const { address } = req.body;
     const ret = await get_nonce(address);
-
-    if(ret) {
-        if(ret[0]) res.status(200).send({ msg: "get nonce successfully", nonce: ret[1] });
-        else res.status(409).send({ msg: ret[1] });
-    } else res.status(409).send({ msg: "unable to communicate with rnode" });
-});
+    sendRhoResult(ret, "nonce", res);
+}));
 
 // 交易
-router.post('/transfer', async (req, res) => {
-    const mp = verify_body(req.body, ["from", "to", "nonce", "amount", "pk", "sig"], res);
-    if(mp == null) return ;
-    const { from, to, nonce, amount, pk, sig } = mp;
-
+router.post('/transfer', requestChecker('body', ["from", "to", "nonce", "amount", "pk", "sig"], async (req, res) => {
+    const { from, to, nonce, amount, pk, sig } = req.body;
     const ret = await transfer(from, to, nonce, amount, pk, sig);
-
-    if(ret) {
-        if(ret[0]) res.status(200).send({ msg: "transfer successfully", ret: ret[1] });
-        else res.status(409).send({ msg: ret[1] });
-    } else res.status(409).send({ msg: "unable to communicate with rnode" });
-});
+    sendRhoResult(ret, "ret", res);
+}));
 
 // 导出路由
 module.exports = router;

@@ -53,7 +53,7 @@ npm run rnode
 npm run deploy
 ```
 
-部署完后会返回一个 `contract_id`，将它粘贴到 `src/common/rhoopt.js` 中。
+部署完后会返回一个 `contract_id`，将它粘贴到 `config.json` 中。
 
 部署合约时，会向部署者的钱包初始化一定数量的代币。
 

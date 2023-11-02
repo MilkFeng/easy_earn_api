@@ -1,9 +1,8 @@
 const express = require('express');
 const { passport, db } = require('./passport.js');
-const sqlite3 = require('sqlite3').verbose();
 
 const { find_wallet } = require('../common/rhoopt.js');
-const { verify_body } = require('../common/utils.js');
+const { requestChecker } = require('../common/utils.js');
 
 const router = express.Router();
 
@@ -31,11 +30,9 @@ router.get('/get-wallets', passport.authenticate('jwt', { session: false }), (re
 });
 
 // 添加钱包地址
-router.post('/add-wallet', passport.authenticate('jwt', { session: false }), async (req, res) => {
+router.post('/add-wallet', passport.authenticate('jwt', { session: false }), requestChecker('body', ['address'], async (req, res) => {
   const userId = req.user.id;
-  const mp = verify_body(req.body, ["address"], res);
-  if (mp === null) return;
-  const { address } = mp;
+  const { address } = req.body;
 
   const ret = await find_wallet(address);
 
@@ -64,15 +61,13 @@ router.post('/add-wallet', passport.authenticate('jwt', { session: false }), asy
     }
     else res.status(409).send({ msg: ret[1] });
   } else return res.status(409).send({ msg: "unable to communicate with rnode" });
-});
+}));
 
 
 // 删除钱包地址
-router.delete('/delete-wallet', passport.authenticate('jwt', { session: false }), (req, res) => {
+router.delete('/delete-wallet', passport.authenticate('jwt', { session: false }), requestChecker('body', ["address"], (req, res) => {
   const userId = req.user.id;
-  const mp = verify_body(req.body, ["address"], res);
-  if (mp === null) return;
-  const { address } = mp;
+  const { address } = req.body;
 
   // 删除数据库中的钱包地址
   db.run('DELETE FROM wallet WHERE userId = ? AND address = ?', [userId, address], (err) => {
@@ -82,7 +77,7 @@ router.delete('/delete-wallet', passport.authenticate('jwt', { session: false })
 
     return res.status(200).send({ msg: 'Address deleted successfully' });
   });
-});
+}));
 
 module.exports = router;
 

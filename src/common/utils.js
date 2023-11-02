@@ -1,75 +1,108 @@
-const { verify_address } = require('../common/rhoopt.js');
+const { verifyRevAddr } = require('@tgrospic/rnode-grpc-js');
 const rchainToolkit = require('@fabcotech/rchain-toolkit');
 
-// 从请求体中获取指定的键值对
-const verify_body = (body, keys, res) => {
+const VerifyUtils = {
+
+  // 验证公钥的合法性
+  verify_public_key(pk) {
     try {
-        let map = {};
-        for (var key of keys) {
-            if (!key in body) {
-                res.status(400).send({ msg: "invalid request body" });
-                return null;
-            }
-            console.log("get " + key + ": " + body[key]);
-            let validate = (_) => true;
-            switch (key) {
-                case 'pk':
-                    // 验证公钥是否合法
-                    validate = (pk) => {
-                        try {
-                            rchainToolkit.utils.revAddressFromPublicKey(pk);
-                            return true;
-                        } catch (err) {
-                            return false;
-                        }
-                    };
-                    break;
-
-                case 'address':
-                case 'from':
-                case 'to':
-                    // 验证钱包地址是否合法
-                    validate = verify_address;
-                    break;
-                case 'amount':
-                    // 交易金额必须是正整数
-                    validate = (amount) => Number.isInteger(amount) && amount > 0;
-                    break;
-
-                case 'addresses':
-                    // 验证钱包地址列表是否合法
-                    validate = (addresses) => {
-                        if (typeof addresses.forEach !== 'function') return false;
-                        addresses.forEach(address => {
-                            if (!verify_address(address)) return false;
-                        });
-                        return true;
-                    };
-                    break;
-
-                case 'nonce':
-                    // 验证交易序号是否合法
-                    validate = (nonce) => Number.isInteger(nonce) && nonce >= 0;
-                    break;
-
-                default:
-                    break;
-            };
-            if (body[key] === undefined || !validate(body[key])) {
-                res.status(400).send({ msg: "invalid " + key + ": " + body[key] });
-                return null;
-            }
-            map[key] = body[key];
-        }
-        return map;
-    } catch(err) {
-        console.error(err);
-        res.status(400).send({ msg: "bad request" });
-        return null;
+      rchainToolkit.utils.revAddressFromPublicKey(pk);
+      return true;
+    } catch (err) {
+      return false;
     }
+  },
+
+  // 验证钱包地址的合法性
+  verify_address(address) {
+    return verifyRevAddr(address);
+  },
+
+  // 验证钱包地址列表的合法性
+  verify_addresses(addresses) {
+    if (typeof addresses.forEach !== 'function') return false;
+    addresses.forEach(address => {
+      if (!VerifyUtils.verify_address(address)) return false;
+    });
+    return true;
+  },
+
+  // 验证交易序号的合法性
+  verify_nonce(nonce) {
+    return Number.isInteger(nonce) && nonce >= 0;
+  },
+
+  // 验证交易金额的合法性
+  verify_amount(amount) {
+    return Number.isInteger(amount) && amount > 0;
+  },
+};
+
+const validator = {
+  pk: VerifyUtils.verify_public_key,
+
+  address: VerifyUtils.verify_address,
+  from: VerifyUtils.verify_address,
+  to: VerifyUtils.verify_address,
+
+  amount: VerifyUtils.verify_amount,
+
+  addresses: VerifyUtils.verify_addresses,
+
+  nonce: VerifyUtils.verify_nonce,
+};
+
+const requestChecker = (type, keys, callback) => async (req, res) => {
+  try {
+    const data = req[type];
+    if (data === undefined) return res.status(400).send({ msg: "invalid request data" });
+    for (var key of keys) {
+      if (!(key in data)) return res.status(400).send({ msg: "invalid request data" });
+
+      console.log("get " + key + ": " + data[key]);
+
+      let validate = validator[key] || ((_) => true);
+
+      if (data[key] === undefined || !validate(data[key])) {
+        console.error("invalid " + key + ": " + data[key]);
+        return res.status(400).send({ msg: "invalid " + key + ": " + data[key] });
+      }
+    }
+    return callback(req, res);
+  } catch (err) {
+    console.error("invalid request data, error: " + err);
+    return res.status(400).send({ msg: "invalid request data" });
+  }
+};
+
+const sendRhoResult = (ret, key, res) => {
+  if (ret) {
+    if (ret[0]) {
+      response = { msg: "operation success"};
+      response[key] = ret[1];
+      res.status(200).send(response);
+    }
+    else res.status(409).send({ msg: ret[1] });
+  } else res.status(409).send({ msg: "unable to communicate with rnode" });
 };
 
 
+const databaseOpt = (query, args, res, callback) => {
+  // 使用数据库连接对象从 db 中获取连接
+  const connection = db.getConnection();
+
+  // 执行查询
+  connection.query(query, args, (error, results) => {
+    if (error) {
+      console.error(error);
+      res.status(500).json({ msg: 'error' });
+    } else callback(results);
+  });
+};
+
 module.exports = {
-    verify_body,
+  VerifyUtils,
+  requestChecker,
+  sendRhoResult,
+  databaseOpt
 };
