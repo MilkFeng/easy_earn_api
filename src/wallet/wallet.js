@@ -37,11 +37,10 @@ router.post('/find', async (req, res) => {
 
     const ret = await find_wallet(address);
 
-    try {
-        return res.status(200).send({ res: ret[0], address: ret[1] });
-    } catch(err) {
-        return res.status(409).send({ msg: "unable to communicate with rnode" });
-    }
+    if(ret) {
+        if(ret[0]) res.status(200).send({ msg: "wallet is found", address: ret[1] });
+        else res.status(409).send({ msg: ret[1] });
+    } else return res.status(409).send({ msg: "unable to communicate with rnode" });
 });
 
 // 检测钱包中的代币余额

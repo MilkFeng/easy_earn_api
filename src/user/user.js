@@ -2,7 +2,7 @@ const express = require('express');
 const { passport, db } = require('./passport.js');
 const sqlite3 = require('sqlite3').verbose();
 
-const { verify_address } = require('../common/rhoopt.js');
+const { find_wallet } = require('../common/rhoopt.js');
 const { verify_body } = require('../common/utils.js');
 
 const router = express.Router();
@@ -31,34 +31,39 @@ router.get('/get-wallets', passport.authenticate('jwt', { session: false }), (re
 });
 
 // 添加钱包地址
-router.post('/add-wallet', passport.authenticate('jwt', { session: false }), (req, res) => {
+router.post('/add-wallet', passport.authenticate('jwt', { session: false }), async (req, res) => {
   const userId = req.user.id;
   const mp = verify_body(req.body, ["address"], res);
-  if(mp === null) return ;
+  if (mp === null) return;
   const { address } = mp;
 
-  if(!verify_address(address)) return res.status(400).send({ msg: 'Invalid address' });
+  const ret = await find_wallet(address);
 
-  // 检查地址是否已存在
-  db.get('SELECT id FROM wallet WHERE userId = ? AND address = ?', [userId, address], (err, row) => {
-    if (err) {
-      return res.status(500).send({ msg: 'Internal Server Error' });
+  if (ret) {
+    if (ret[0]) {
+      // 检查地址是否已存在
+      db.get('SELECT id FROM wallet WHERE userId = ? AND address = ?', [userId, address], (err, row) => {
+        if (err) {
+          return res.status(500).send({ msg: 'Internal Server Error' });
+        }
+
+        if (row) {
+          // 地址已存在
+          return res.status(400).send({ msg: 'Address already exists' });
+        }
+
+        // 插入新的钱包地址
+        db.run('INSERT INTO wallet (userId, address) VALUES (?, ?)', [userId, address], (err) => {
+          if (err) {
+            return res.status(500).send({ msg: 'Internal Server Error' });
+          }
+
+          return res.status(200).send({ msg: 'Address added successfully' });
+        });
+      });
     }
-
-    if (row) {
-      // 地址已存在
-      return res.status(400).send({ msg: 'Address already exists' });
-    }
-
-    // 插入新的钱包地址
-    db.run('INSERT INTO wallet (userId, address) VALUES (?, ?)', [userId, address], (err) => {
-      if (err) {
-        return res.status(500).send({ msg: 'Internal Server Error' });
-      }
-
-      return res.status(200).send({ msg: 'Address added successfully' });
-    });
-  });
+    else res.status(409).send({ msg: ret[1] });
+  } else return res.status(409).send({ msg: "unable to communicate with rnode" });
 });
 
 
@@ -66,7 +71,7 @@ router.post('/add-wallet', passport.authenticate('jwt', { session: false }), (re
 router.delete('/delete-wallet', passport.authenticate('jwt', { session: false }), (req, res) => {
   const userId = req.user.id;
   const mp = verify_body(req.body, ["address"], res);
-  if(mp === null) return ;
+  if (mp === null) return;
   const { address } = mp;
 
   // 删除数据库中的钱包地址
