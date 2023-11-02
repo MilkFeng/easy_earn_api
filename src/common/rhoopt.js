@@ -2,7 +2,7 @@ const { func_deploy, func_deploy_fromfile } = require('./deploy.js');
 const { verifyRevAddr } = require('@tgrospic/rnode-grpc-js')
 
 // 将 contract id 粘贴到这里
-const contract_id = "rho:id:mat7sowkydt3e9premezm78iu7oqtd7zpwg3usnmpu6mtqwqqf1pjz";
+const contract_id = "rho:id:3w8zg13xnsbgbyx6cgfhyrw4nsriwyjycbiwo38xercxzfoesaop33";
 
 const run_with_full_code = async (code) => await func_deploy(code, 0);
 
@@ -68,11 +68,23 @@ const get_task_nonce = async (address) => await run_with_name_and_args("taskNonc
 // 获取提交序号
 const get_record_nonce = async (address) => await run_with_name_and_args("recordNonceOf", `"${address}"`);
 
-// 获取任务的哈希值和状态
+// 获取任务的哈希值
 const get_task = async (address, nonce) => await run_with_name_and_args("taskOf", `"${address}", ${nonce}`);
 
 // 获取提交记录的哈希值
 const get_record = async (address, nonce) => await run_with_name_and_args("recordOf", `"${address}", ${nonce}`);
+
+// 获取钱包的更新序号
+const get_update_nonce = async (address) => await run_with_name_and_args("updateNonceOf", `"${address}"`);
+
+// 提交任务
+const upload_task = async (address, nonce, hash, pk, sig) => await run_with_name_and_args("uploadTask", `"${address}", ${nonce}, "${hash}", "${pk}", "${sig}"`);
+
+//更新任务
+const update_task = async (address, task_nonce, update_nonce, hash, pk, sig) => await run_with_name_and_args("updateTask", `"${address}", ${task_nonce}, ${update_nonce} ,"${hash}", "${pk}", "${sig}"`);
+
+//提交记录
+const upload_record = async (submitter, submit_nonce, publisher, publish_nonce, hash, pk, sig) => await run_with_name_and_args("uploadRecord",`"${submitter}", ${submit_nonce}, "${publisher}", ${publish_nonce} ,"${hash}", "${pk}", "${sig}"`);
 
 module.exports = {
     create_wallet,
@@ -86,4 +98,8 @@ module.exports = {
     get_record_nonce,
     get_task,
     get_record,
+    get_update_nonce,
+    upload_task,
+    update_task,
+    upload_record,
 };
