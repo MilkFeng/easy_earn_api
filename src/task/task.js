@@ -29,7 +29,7 @@ db.run(`CREATE TABLE IF NOT EXISTS task_record (
 )`);
 
 // 从区块链获取指定任务（哈希）
-router.post('/task-hash', passport.authenticate('jwt', { session: false }), requestChecker('query', ['address', 'nonce'], async (req, res) => {
+router.get('/task-hash', passport.authenticate('jwt', { session: false }), requestChecker('query', ['address', 'nonce'], async (req, res) => {
   const { address, nonce } = req.query;
   const ret = await RhoOpts.get_task(address, nonce);
   sendRhoResult(ret, "hash", res);
