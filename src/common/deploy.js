@@ -3,8 +3,9 @@ const protoLoader = require('@grpc/proto-loader');
 const rchainToolkit = require('@fabcotech/rchain-toolkit');
 const rchainToolkit_grpc = require('@fabcotech/rchain-toolkit/dist/grpc.js');
 const fs = require('fs');
+const { config } = require('./config.js');
 
-const PRIVATE_KEY = '6b2c9887ce24094087896a0fa3c64e3faec8ad06f16fbe72da3a44463aeca8a9';
+const PRIVATE_KEY = config.private_key;
 const PUBLIC_KEY = rchainToolkit.utils.publicKeyFromPrivateKey(PRIVATE_KEY);
 const READ_ONLY_HOST = 'http://localhost:40403';
 const VALIDATOR_HOST = 'http://localhost:40403';

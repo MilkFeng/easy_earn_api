@@ -1,5 +1,5 @@
 const express = require('express');
-const { passport, db } = require('./passport.js');
+const { passport, db } = require('../auth/passport.js');
 
 const { find_wallet } = require('../common/rhoopt.js');
 const { requestChecker } = require('../common/utils.js');
@@ -11,6 +11,10 @@ db.run(`CREATE TABLE IF NOT EXISTS wallet (
   userId TEXT NOT NULL,
   address TEXT NOT NULL
 )`);
+
+router.get('/', passport.authenticate('jwt', { session: false }), (req, res) => {
+  return res.status(200).send({ msg: "success" });
+});
 
 router.get('/get-wallets', passport.authenticate('jwt', { session: false }), (req, res) => {
   const userId = req.user.id;
@@ -25,7 +29,7 @@ router.get('/get-wallets', passport.authenticate('jwt', { session: false }), (re
     const addresses = rows.map(row => row.address);
 
     // 返回地址列表给客户端
-    return res.status(200).send({ addresses: addresses });
+    return res.status(200).send({ msg: "success", addresses: addresses });
   });
 });
 

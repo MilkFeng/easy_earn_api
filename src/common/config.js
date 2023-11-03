@@ -7,6 +7,7 @@ if (fs.existsSync(config_path)) _config = JSON.parse(fs.readFileSync(config_path
 
 const config = {
   contract_id: _config.contract_id || 'rho:id:98x5p8qypec8u7pagiejkuecgzi9ehm5ewui7xwmzk11ttypequgpx',
+  private_key: _config.private_key || '6b2c9887ce24094087896a0fa3c64e3faec8ad06f16fbe72da3a44463aeca8a9',
 };
 
 if (!fs.existsSync(config_path)) {

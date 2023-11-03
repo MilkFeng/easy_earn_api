@@ -95,7 +95,7 @@ const databaseOpt = (query, args, res, callback) => {
   connection.query(query, args, (error, results) => {
     if (error) {
       console.error(error);
-      res.status(500).json({ msg: 'error' });
+      res.status(500).json({ msg: 'database error' });
     } else callback(results);
   });
 };
