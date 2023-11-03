@@ -1,6 +1,6 @@
 const express = require('express');
-const { requestChecker, sendRhoResult } = require('../common/utils');
-const { passport } = require('../auth/passport.js');
+const { requestChecker, sendRhoResult } = require('./common/utils');
+const { passport } = require('./common/passport.js');
 
 const {
     create_wallet,
@@ -8,7 +8,7 @@ const {
     get_balance,
     get_nonce,
     transfer,
-} = require('./../common/rhoopt.js');
+} = require('./common/rhoopt.js');
 
 // 创建一个路由
 const router = express.Router();

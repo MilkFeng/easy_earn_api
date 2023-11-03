@@ -2,14 +2,11 @@ const passport = require('passport');
 const LocalStrategy = require('passport-local').Strategy;
 const JwtStrategy = require('passport-jwt').Strategy;
 const ExtractJwt = require('passport-jwt').ExtractJwt;
-const sqlite3 = require('sqlite3').verbose();
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const { db } = require('./database.js');
 
 const secretKey = 'your_secret_key';
-
-// 创建SQLite数据库连接
-const db = new sqlite3.Database('./src/database/users.db');
 
 db.run(`CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -90,4 +87,4 @@ const sign = (user, opt) => {
   return jwt.sign(user, secretKey, opt);
 }
 
-module.exports = { passport, sign, db };
+module.exports = { passport, sign };

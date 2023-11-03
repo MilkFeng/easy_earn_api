@@ -24,7 +24,7 @@ function uint8ArrayToHexString(uint8Array) {
 
 const privateKey = "6b2c9887ce24094087896a0fa3c64e3faec8ad06f16fbe72da3a44463aeca8a9"
 
-const bytes = rchainToolkit.utils.toByteArray(["11112gNSU4Ytt3b2TpAQnggARSidPpNxrNkWqFFg52aNe5t6sjCy2c", "1111ZRURmcdeTvHoGcDdsZtanGy7BuEwHhYr3NKni96tTY3J2kXTp", 0, 30])
+const bytes = rchainToolkit.utils.toByteArray(["11112gNSU4Ytt3b2TpAQnggARSidPpNxrNkWqFFg52aNe5t6sjCy2c", 6, "612ecb39e5f3fb448e30941270c9a6d7e237ce4214af363e97ebefafda35a724"])
 const hash = rchainToolkit.utils.getBlake2Hash(bytes)
 
 console.log(bytes);
@@ -54,7 +54,7 @@ console.log(signSecp256k1(hash, privateKey))
 
 console.log(hexToByteArray(privateKey))
 console.log(sig2.signature)
-console.log(uint8ArrayToHexString(sig2.signature))
+console.log(uint8ArrayToHexString(sig2.signature));
 
 // {
 //     "from": "11112gNSU4Ytt3b2TpAQnggARSidPpNxrNkWqFFg52aNe5t6sjCy2c",
@@ -62,3 +62,10 @@ console.log(uint8ArrayToHexString(sig2.signature))
 //     "nonce": 0,
 //     "amount": 100,
 // }
+
+
+const crypto = require('crypto');
+const Hash = crypto.createHash('sha256');
+
+Hash.push('{version:1,text:\"test\"}');
+console.log(Hash.digest('hex'));

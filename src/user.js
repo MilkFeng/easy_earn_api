@@ -1,8 +1,9 @@
 const express = require('express');
-const { passport, db } = require('../auth/passport.js');
+const { passport } = require('./common/passport.js');
+const { db } = require('./common/database.js');
 
-const { find_wallet } = require('../common/rhoopt.js');
-const { requestChecker } = require('../common/utils.js');
+const { find_wallet } = require('./common/rhoopt.js');
+const { requestChecker } = require('./common/utils.js');
 
 const router = express.Router();
 

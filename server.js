@@ -64,10 +64,10 @@ app.use((err, req, res, next) => {
 });
 
 // 引入路由
-const wallet_router = require('./src/wallet/wallet.js');
-const auth_router = require('./src/auth/auth.js');
-const user_router = require("./src/user/user.js");
-const task_router = require("./src/task/task.js");
+const wallet_router = require('./src/wallet.js');
+const auth_router = require('./src/auth.js');
+const user_router = require("./src/user.js");
+const task_router = require("./src/task.js");
 
 // 使用路由
 app.use('/wallet', wallet_router);

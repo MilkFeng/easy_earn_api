@@ -80,7 +80,7 @@ const upload_task = async (address, nonce, hash, pk, sig) => await run_with_name
 const update_task = async (address, task_nonce, update_nonce, hash, pk, sig) => await run_with_name_and_args("updateTask", `"${address}", ${task_nonce}, ${update_nonce} ,"${hash}", "${pk}", "${sig}"`);
 
 //提交记录
-const upload_record = async (submitter, submit_nonce, publisher, publish_nonce, hash, pk, sig) => await run_with_name_and_args("uploadRecord",`"${submitter}", ${submit_nonce}, "${publisher}", ${publish_nonce} ,"${hash}", "${pk}", "${sig}"`);
+const upload_record = async (publisher, publish_nonce, submitter, submit_nonce, hash, pk, sig) => await run_with_name_and_args("uploadRecord",`"${submitter}", ${submit_nonce}, "${publisher}", ${publish_nonce} ,"${hash}", "${pk}", "${sig}"`);
 
 module.exports = {
     create_wallet,

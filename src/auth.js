@@ -1,5 +1,5 @@
 const express = require('express');
-const { passport, sign, db } = require('./passport.js');
+const { passport, sign, db } = require('./common/passport.js');
 const bcrypt = require('bcrypt');
 
 const router = express.Router();

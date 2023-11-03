@@ -1,10 +1,10 @@
 const express = require('express');
-const { requestChecker, sendRhoResult, databaseOpt } = require('../common/utils.js');
-const { passport, db } = require('../auth/passport.js');
-const RhoOpts = require('../common/rhoopt.js');
+const { requestChecker, sendRhoResult, databaseOpt } = require('./common/utils.js');
+const { passport } = require('./common/passport.js');
+const { db } = require('./common/database.js');
+const RhoOpts = require('./common/rhoopt.js');
 
 const crypto = require('crypto');
-const Hash = crypto.createHash('sha256');
 const router = express.Router();
 
 // 创建表
@@ -68,9 +68,9 @@ router.get('/update-nonce/:address', passport.authenticate('jwt', { session: fal
 router.get('/get-task', passport.authenticate('jwt', { session: false }), requestChecker('query', ['address', 'nonce'], async (req, res) => {
   const { address, nonce } = req.query;
   const query = 'SELECT * FROM task WHERE address = ? AND nonce = ?';
-  databaseOpt(query, [address, nonce], res, results => {
-    if (results.length === 0) return res.status(500).json({ msg: 'result is empty' });
-    res.status(200).json({ msg: "get task successfully", task: tasks[0] });
+  databaseOpt('get', query, [address, nonce], res, row => {
+    if (!row) return res.status(500).json({ msg: 'task not found' });
+    res.status(200).json({ msg: "get task successfully", task: row });
   });
 }));
 
@@ -79,8 +79,13 @@ router.get('/get-all-tasks', passport.authenticate('jwt', { session: false }), r
   const { address } = req.query;
 
   const query = 'SELECT * FROM task WHERE address = ?';
-  databaseOpt(query, [address], res, results => {
-    if (results.length === 0) return res.status(500).json({ msg: 'result is empty' });
+  databaseOpt('all', query, [address], res, rows => {
+    if (!rows) return res.status(500).json({ msg: 'result is null' });
+    const tasks = rows.map(row => ({
+      address: row.address,
+      nonce: row.nonce,
+      content: row.content
+    }));
     res.status(200).json({ msg: "get tasks successfully", tasks });
   });
 }));
@@ -91,10 +96,9 @@ router.get('/get-record', passport.authenticate('jwt', { session: false }), requ
 
   // 构造SQL查询语句
   const query = 'SELECT * FROM record WHERE address = ? AND nonce = ?';
-
-  databaseOpt(query, [address, nonce], res, results => {
-    if (results.length === 0) return res.status(500).json({ msg: 'result is empty' });
-    res.status(200).json({ msg: "get task successfully", record: results[0] });
+  databaseOpt('get', query, [address, nonce], res, row => {
+    if (!row) return res.status(500).json({ msg: 'task not found' });
+    res.status(200).json({ msg: "get record successfully", record: row });
   });
 }));
 
@@ -109,7 +113,7 @@ router.get('/get-all-records-of', passport.authenticate('jwt', { session: false 
       AND task_record.record_nonce = record.nonce
       WHERE task_record.task_address = ? AND task_record.task_nonce = ?;
     `;
-  databaseOpt(query, [address, nonce], res, results => {
+  databaseOpt('all', query, [address, nonce], res, results => {
     if (results.length === 0) return res.status(500).json({ msg: 'result is empty' });
     const records = results.map(record => ({
       address: record.address,
@@ -128,18 +132,19 @@ router.post('/upload', passport.authenticate('jwt', { session: false }), request
   const { address, nonce, content, hash, pk, sig } = req.body;
 
   // 验证哈希值
+  const Hash = crypto.createHash('sha256');
   Hash.update(content);
   const hashedContent = Hash.digest('hex'); // 'hex' 表示返回十六进制的哈希值
-  if (hashedContent != hash) return res.status(400).json({ msg: "hash do not match with content" });
+  if (hashedContent != hash) return res.status(400).json({ msg: "hash do not match with content, expect hash: " + hashedContent });
 
   // 将 hash 存入区块链
-  const ret = await RhoOpts.upload_task(address, nonce, content, hash, pk, sig);
+  const ret = await RhoOpts.upload_task(address, nonce, hash, pk, sig);
   if (!ret) return res.status(409).send({ msg: "unable to communicate with rnode" });
   else if (!ret[0]) return res.status(409).send({ msg: ret[1] });
 
   // 上传任务，将 content 存入数据库
   const query = 'INSERT INTO task (address, nonce, content) VALUES (?, ?, ?)';
-  databaseOpt(query, [address, nonce, content], _ => {
+  databaseOpt('run', query, [address, nonce, content], res, _ => {
     res.status(200).json({ msg: "upload successfully" });
   });
 }));
@@ -149,9 +154,10 @@ router.post('/update', passport.authenticate('jwt', { session: false }), request
   const { address, task_nonce, update_nonce, content, hash, pk, sig } = mp;
 
   // 验证哈希值
+  const Hash = crypto.createHash('sha256');
   Hash.update(content);
   const hashedContent = Hash.digest('hex'); // 'hex' 表示返回十六进制的哈希值
-  if (hashedContent != hash) return res.status(400).json({ msg: "hash do not match with content" });
+  if (hashedContent != hash) return res.status(400).json({ msg: "hash do not match with content, expect hash: " + hashedContent });
 
   // 将 hash 存入区块链
   const ret = await RhoOpts.update_task(address, task_nonce, update_nonce, content, hash, pk, sig);
@@ -160,7 +166,7 @@ router.post('/update', passport.authenticate('jwt', { session: false }), request
 
   // 更新任务，将 content 存入数据库
   const query = 'UPDATE task SET content = ? where address = ? and nonce = ?';
-  databaseOpt(query, [content, address, task_nonce], _ => {
+  databaseOpt('run', query, [content, address, task_nonce], res, _ => {
     res.status(200).json({ msg: "update successfully" });
   });
 }));
@@ -170,9 +176,10 @@ router.post('/submit', passport.authenticate('jwt', { session: false }), request
   const { task_address, task_nonce, record_address, record_nonce, content, hash, pk, sig } = req.body;
 
   // 验证哈希值
+  const Hash = crypto.createHash('sha256');
   Hash.update(content);
   const hashedContent = Hash.digest('hex'); // 'hex' 表示返回十六进制的哈希值
-  if (hashedContent != hash) return res.status(400).json({ msg: "hash do not match with content" });
+  if (hashedContent != hash) return res.status(400).json({ msg: "hash do not match with content, expect hash: " + hashedContent });
 
   // 将 hash 存入区块链
   const ret = await RhoOpts.upload_record(task_address, task_nonce, record_address, record_nonce, hash, pk, sig);
@@ -186,7 +193,7 @@ router.post('/submit', passport.authenticate('jwt', { session: false }), request
     INSERT INTO task_record (task_address, task_nonce, record_address, record_nonce) VALUES (?, ?, ?, ?);
     COMMIT TRANSACTION;
   `;
-  databaseOpt(query, [record_address, record_nonce, content, task_address, task_nonce, record_address, record_nonce], res, results => {
+  databaseOpt('run', query, [record_address, record_nonce, content, task_address, task_nonce, record_address, record_nonce], res, results => {
     return res.status(200).json({ msg: "upload successfully" });
   });
 
