@@ -74,6 +74,20 @@ router.get('/get-task', passport.authenticate('jwt', { session: false }), reques
   });
 }));
 
+// 从数据库获取全部任务（内容、酬金、状态）
+router.get('/get-tasks', passport.authenticate('jwt', { session: false }), requestChecker('query',  [], (req, res) => {
+  const query = 'SELECT * FROM task';
+  databaseOpt('all', query, [], res, rows => {
+    if (!rows) return res.status(500).json({ msg: 'tasks not found' });
+    const tasks = rows.map(row => ({
+      address: row.address,
+      nonce: row.nonce,
+      content: row.content
+    }));
+    res.status(200).json({ msg: "get tasks successfully", tasks });
+  });
+}));
+
 // 从数据库获取指定钱包所有上传的任务
 router.get('/get-all-tasks', passport.authenticate('jwt', { session: false }), requestChecker('query', ["address"], (req, res) => {
   const { address } = req.query;
