@@ -1,6 +1,7 @@
 const express = require('express');
-const { passport, sign, db } = require('./common/passport.js');
+const { passport, sign } = require('./common/passport.js');
 const bcrypt = require('bcrypt');
+const { db } = require("./common/database.js")
 
 const router = express.Router();
 
